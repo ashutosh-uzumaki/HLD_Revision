@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebSockets: 0 to 100 — SDE-2 Interview Mastery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1017;
+    --bg-2:#11151e;
+    --surface:#161b25;
+    --surface-2:#1c2230;
+    --line:#262d3b;
+    --line-soft:#1f2531;
+    --ink:#e7ebf2;
+    --ink-mid:#aab3c3;
+    --ink-dim:#737d8e;
+    /* client = cyan ; server = violet ; the open pipe = gradient of both */
+    --cyan:#3fc8e2;
+    --cyan-soft:#0f2c36;
+    --violet:#8a7dff;
+    --violet-soft:#221f3d;
+    --red:#ff6b6b;
+    --green:#5bd66f;
+    --amber:#f0a541;
+    --radius:14px;
+    --mono:'JetBrains Mono',monospace;
+    --disp:'Space Grotesk',sans-serif;
+    --body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.6;font-size:15.5px;-webkit-font-smoothing:antialiased}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+
+  .shell{display:grid;grid-template-columns:268px 1fr;max-width:1480px;margin:0 auto}
+  .sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:linear-gradient(180deg,#0f131b,#0c0f16);padding:26px 18px 40px}
+  .side-brand{font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:-0.01em;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .side-brand .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));display:grid;place-items:center;color:#0d1017;font-weight:700;font-size:13px}
+  .side-sub{font-size:12px;color:var(--ink-dim);margin-bottom:22px;font-family:var(--mono)}
+  .nav-group-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-dim);margin:18px 0 7px 8px;font-weight:600}
+  .nav a{display:flex;align-items:center;gap:9px;color:var(--ink-mid);text-decoration:none;font-size:13.5px;padding:7px 10px;border-radius:8px;transition:.15s;border-left:2px solid transparent}
+  .nav a .num{font-family:var(--mono);font-size:11px;color:var(--ink-dim);width:18px}
+  .nav a:hover{background:var(--surface);color:var(--ink)}
+  .nav a.active{background:var(--surface-2);color:var(--ink);border-left-color:var(--violet)}
+  .nav a.active .num{color:var(--violet)}
+
+  .main{min-width:0;padding:0 0 120px}
+  .wrap{max-width:860px;margin:0 auto;padding:0 38px}
+
+  .hero{padding:62px 0 40px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-family:var(--mono);font-size:12px;color:var(--violet);letter-spacing:0.05em;margin-bottom:16px;display:flex;gap:8px;align-items:center}
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--violet)}
+  h1.title{font-family:var(--disp);font-weight:700;font-size:clamp(34px,5vw,52px);line-height:1.05;letter-spacing:-0.02em;margin-bottom:18px}
+  h1.title .accent{background:linear-gradient(100deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero-lead{font-size:17px;color:var(--ink-mid);max-width:640px;margin-bottom:30px}
+
+  /* ---------- full-duplex pipe signature ---------- */
+  .duplex{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius);padding:24px 22px 18px;overflow:hidden}
+  .duplex-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+  .duplex-title{font-family:var(--mono);font-size:12.5px;color:var(--ink-mid)}
+  .duplex-tag{font-family:var(--mono);font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid var(--line);color:var(--green)}
+  .pipe-row{display:grid;grid-template-columns:92px 1fr 92px;align-items:center;gap:0;margin-top:18px}
+  .node{text-align:center;font-family:var(--mono);font-size:12px}
+  .node .box{width:78px;height:78px;border-radius:14px;display:grid;place-items:center;font-size:24px;margin:0 auto 8px;border:1px solid var(--line);background:var(--surface)}
+  .node.client .box{border-color:var(--cyan);box-shadow:0 0 24px -10px var(--cyan)}
+  .node.server .box{border-color:var(--violet);box-shadow:0 0 24px -10px var(--violet)}
+  .node.client{color:var(--cyan)}
+  .node.server{color:var(--violet)}
+  .pipe{position:relative;height:78px;margin:0 6px;border-radius:40px;background:linear-gradient(90deg,var(--cyan-soft),var(--violet-soft));border:1px solid var(--line);overflow:hidden}
+  .pipe::before{content:"one persistent TCP connection";position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);letter-spacing:.04em}
+  .frame{position:absolute;top:50%;transform:translateY(-50%);padding:4px 10px;border-radius:8px;font-family:var(--mono);font-size:10.5px;white-space:nowrap;z-index:2}
+  .frame.c2s{background:var(--cyan-soft);color:var(--cyan);border:1px solid var(--cyan);animation:c2s 2.6s linear forwards;top:30%}
+  .frame.s2c{background:var(--violet-soft);color:var(--violet);border:1px solid var(--violet);animation:s2c 2.6s linear forwards;top:62%}
+  @keyframes c2s{from{left:-12%;opacity:0}10%{opacity:1}90%{opacity:1}to{left:100%;opacity:0}}
+  @keyframes s2c{from{left:100%;opacity:0}10%{opacity:1}90%{opacity:1}to{left:-12%;opacity:0}}
+  .heartbeat{display:flex;gap:18px;margin-top:18px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-mid)}
+  .heartbeat span b{color:var(--ink)}
+  .hb-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+
+  section{padding:54px 0;border-bottom:1px solid var(--line-soft);scroll-margin-top:20px}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--violet);letter-spacing:.08em}
+  h2{font-family:var(--disp);font-weight:600;font-size:30px;letter-spacing:-0.015em;margin:6px 0 8px}
+  h3{font-family:var(--disp);font-weight:600;font-size:19px;margin:32px 0 10px;color:var(--ink)}
+  h4{font-family:var(--disp);font-weight:600;font-size:15.5px;margin:20px 0 6px;color:var(--ink)}
+  p{margin-bottom:14px;color:var(--ink-mid)}
+  p strong,li strong{color:var(--ink);font-weight:600}
+  .lead{font-size:16px;color:var(--ink-mid);max-width:670px;margin-bottom:8px}
+  ul,ol{margin:6px 0 16px;padding-left:22px;color:var(--ink-mid)}
+  li{margin-bottom:7px}
+  code{font-family:var(--mono);font-size:0.88em;background:var(--surface-2);padding:2px 6px;border-radius:5px;color:var(--cyan);border:1px solid var(--line-soft)}
+
+  .model{border-left:3px solid var(--cyan);background:var(--cyan-soft);padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0}
+  .model .lbl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--cyan);margin-bottom:5px;font-weight:600}
+  .model p{color:var(--ink);margin:0;font-size:14.5px}
+  .warn{border-left:3px solid var(--amber);background:#3a2c14;padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0}
+  .warn .lbl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);margin-bottom:5px;font-weight:600}
+  .warn p{color:var(--ink);margin:0;font-size:14.5px}
+
+  pre{background:#0a0d13;border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;margin:14px 0;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--ink-mid)}
+  pre .c{color:var(--ink-dim)}
+  pre .k{color:var(--violet)}
+  pre .s{color:var(--cyan)}
+  pre .n{color:var(--amber)}
+
+  .grid{display:grid;gap:14px;margin:18px 0}
+  .grid.g2{grid-template-columns:1fr 1fr}
+  .grid.g3{grid-template-columns:repeat(3,1fr)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h4{margin-top:0}
+  .card p{font-size:13.5px;margin-bottom:0}
+  .pill{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid var(--line);margin:0 5px 5px 0}
+  .pill.c{color:var(--cyan);background:var(--cyan-soft);border-color:transparent}
+  .pill.s{color:var(--violet);background:var(--violet-soft);border-color:transparent}
+
+  .vocab{display:grid;grid-template-columns:170px 1fr;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:18px 0}
+  .vocab dt{font-family:var(--mono);font-size:13px;color:var(--violet);padding:12px 16px;border-bottom:1px solid var(--line-soft);background:var(--bg-2);display:flex;align-items:center}
+  .vocab dd{padding:12px 16px;border-bottom:1px solid var(--line-soft);font-size:14px;color:var(--ink-mid)}
+  .vocab dt:last-of-type,.vocab dd:last-of-type{border-bottom:none}
+
+  /* protocol picker interactive */
+  .proto{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;margin:20px 0}
+  .proto-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .proto-tabs button{font-family:var(--mono);font-size:12.5px;padding:9px 14px;border-radius:9px;cursor:pointer;background:var(--bg-2);border:1px solid var(--line);color:var(--ink-mid);transition:.15s}
+  .proto-tabs button.active{background:var(--violet);color:#0d1017;border-color:var(--violet);font-weight:700}
+  .proto-body{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+  .proto-desc h4{margin-top:0}
+  .proto-desc p{font-size:14px}
+  .meters{display:flex;flex-direction:column;gap:13px}
+  .meter .mlbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;margin-bottom:5px;color:var(--ink-mid)}
+  .meter .track{height:9px;border-radius:6px;background:var(--bg-2);overflow:hidden;border:1px solid var(--line-soft)}
+  .meter .fill{height:100%;border-radius:6px;transition:width .5s cubic-bezier(.2,.7,.3,1)}
+  .fill.rt{background:linear-gradient(90deg,#2a7,#5bd66f)}
+  .fill.ef{background:linear-gradient(90deg,#357,var(--cyan))}
+  .fill.bi{background:linear-gradient(90deg,#54a,var(--violet))}
+  .fill.sm{background:linear-gradient(90deg,#c80,var(--amber))}
+
+  .cmp-filter,.qfilter{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px}
+  .cmp-filter button,.qfilter button{font-family:var(--mono);font-size:12px;padding:7px 13px;border-radius:8px;cursor:pointer;background:var(--bg-2);border:1px solid var(--line);color:var(--ink-mid);transition:.15s}
+  .cmp-filter button.active{background:var(--surface-2);color:var(--ink);border-color:var(--cyan)}
+  .qfilter button.active{background:var(--violet);color:#0d1017;border-color:var(--violet);font-weight:700}
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{border-collapse:collapse;width:100%;min-width:680px;font-size:13.5px}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  th{font-family:var(--disp);font-weight:600;color:var(--ink);background:var(--bg-2);font-size:13px}
+  td:first-child{font-family:var(--mono);font-size:12.5px;color:var(--violet);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .y{color:var(--green)}td .x{color:var(--red)}
+
+  .qa{border:1px solid var(--line);border-radius:11px;margin-bottom:11px;overflow:hidden;background:var(--surface)}
+  .qa summary{cursor:pointer;padding:15px 18px;font-family:var(--disp);font-weight:500;font-size:15px;color:var(--ink);list-style:none;display:flex;gap:12px;align-items:flex-start}
+  .qa summary::-webkit-details-marker{display:none}
+  .qa summary .qbadge{font-family:var(--mono);font-size:9.5px;padding:3px 8px;border-radius:6px;flex:0 0 auto;margin-top:2px;letter-spacing:.04em}
+  .b-scn{background:var(--cyan-soft);color:var(--cyan)}
+  .b-cnc{background:var(--violet-soft);color:var(--violet)}
+  .b-cor{background:#3a2c14;color:var(--amber)}
+  .qa summary .arw{margin-left:auto;color:var(--ink-dim);transition:.2s;flex:0 0 auto}
+  .qa[open] summary .arw{transform:rotate(90deg);color:var(--violet)}
+  .qa .ans{padding:0 18px 18px;font-size:14px;color:var(--ink-mid);border-top:1px solid var(--line-soft);padding-top:14px}
+  .qa .ans strong{color:var(--ink)}.qa .ans ul{margin-top:6px}
+
+  .quiz{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px;margin-top:20px;text-align:center}
+  .quiz-prog{font-family:var(--mono);font-size:12px;color:var(--ink-dim);margin-bottom:10px}
+  .quiz-q{font-family:var(--disp);font-size:18px;font-weight:500;min-height:54px;display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+  .quiz-card{cursor:pointer;margin-bottom:18px}
+  .quiz-a{background:var(--bg-2);border:1px dashed var(--line);border-radius:12px;padding:18px;color:var(--ink-mid);font-size:14.5px;min-height:80px;display:flex;align-items:center;justify-content:center;transition:.2s}
+  .quiz-a.hidden-a{color:var(--ink-dim);font-family:var(--mono);font-size:12.5px;letter-spacing:.04em}
+  .quiz-a.show{border-style:solid;border-color:var(--cyan);background:var(--cyan-soft);color:var(--ink)}
+  .quiz-ctrls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .quiz-ctrls button{font-family:var(--disp);font-size:14px;font-weight:500;padding:10px 22px;border-radius:10px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);transition:.15s}
+  .quiz-ctrls button:hover{border-color:var(--violet)}
+  .quiz-ctrls .primary{background:var(--violet);color:#0d1017;border-color:var(--violet);font-weight:700}
+
+  .footnote{font-size:13px;color:var(--ink-dim);margin-top:28px;font-family:var(--mono)}
+  .toplink{font-family:var(--mono);font-size:12px;color:var(--ink-dim);text-decoration:none;display:inline-block;margin-top:8px}
+  .toplink:hover{color:var(--violet)}
+
+  .menu-btn{display:none}
+  @media (max-width:900px){
+    .shell{grid-template-columns:1fr}
+    .sidebar{position:fixed;z-index:50;width:268px;left:0;top:0;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.6)}
+    .sidebar.open{transform:none}
+    .menu-btn{display:flex;position:fixed;z-index:60;top:14px;left:14px;width:42px;height:42px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);align-items:center;justify-content:center;cursor:pointer;font-size:18px}
+    .wrap{padding:0 20px}.hero{padding-top:70px}
+    .proto-body{grid-template-columns:1fr}
+    .grid.g2,.grid.g3{grid-template-columns:1fr}
+    .vocab{grid-template-columns:1fr}.vocab dt{border-bottom:none;padding-bottom:0}
+    .pipe-row{grid-template-columns:70px 1fr 70px}.node .box{width:60px;height:60px;font-size:20px}
+  }
+</style>
+</head>
+<body>
+
+<button class="menu-btn" onclick="document.getElementById('sb').classList.toggle('open')" aria-label="Toggle menu">☰</button>
+
+<div class="shell">
+  <aside class="sidebar" id="sb">
+    <div class="side-brand"><span class="logo">WS</span> WebSockets 0→100</div>
+    <div class="side-sub">SDE-2 interview mastery</div>
+    <nav class="nav" id="nav">
+      <div class="nav-group-label">Foundations</div>
+      <a href="#intro"><span class="num">01</span> What WebSockets are</a>
+      <a href="#handshake"><span class="num">02</span> The handshake</a>
+      <a href="#frames"><span class="num">03</span> Frames & heartbeats</a>
+      <div class="nav-group-label">The big comparison</div>
+      <a href="#protocols"><span class="num">04</span> Real-time protocols</a>
+      <a href="#compare"><span class="num">05</span> WS vs alternatives</a>
+      <div class="nav-group-label">Going deep</div>
+      <a href="#scaling"><span class="num">06</span> Scaling connections</a>
+      <a href="#failover"><span class="num">07</span> Reliability & reconnect</a>
+      <a href="#security"><span class="num">08</span> Auth & security</a>
+      <a href="#tradeoffs"><span class="num">09</span> Tradeoffs</a>
+      <div class="nav-group-label">Applied</div>
+      <a href="#usecases"><span class="num">10</span> Use cases & architecture</a>
+      <div class="nav-group-label">Interview</div>
+      <a href="#questions"><span class="num">11</span> Scenario Q&A</a>
+      <a href="#quiz"><span class="num">12</span> Rapid-fire quiz</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="wrap">
+
+      <header class="hero">
+        <div class="eyebrow">REAL-TIME, FULL-DUPLEX TRANSPORT</div>
+        <h1 class="title">WebSockets, from zero to <span class="accent">scaled-to-millions</span> intuition.</h1>
+        <p class="hero-lead">HTTP is a one-shot question-and-answer. A WebSocket is a <strong>single, persistent, full-duplex connection</strong> — once open, client and server push messages to each other any time, with almost no per-message overhead. The hard part isn't opening one; it's running a million of them. That's the interview.</p>
+
+        <div class="duplex">
+          <div class="duplex-head">
+            <div class="duplex-title">wss://chat.app/socket &nbsp;·&nbsp; status: <span style="color:var(--green)">OPEN</span></div>
+            <span class="duplex-tag">101 Switching Protocols</span>
+          </div>
+          <div class="pipe-row">
+            <div class="node client"><div class="box">💻</div>Client</div>
+            <div class="pipe" id="pipe"></div>
+            <div class="node server"><div class="box">🖥️</div>Server</div>
+          </div>
+          <div class="heartbeat">
+            <span><span class="hb-dot"></span><b>ping / pong</b> heartbeat keeps it alive & detects death</span>
+            <span style="color:var(--cyan)"><b>→</b> client frames</span>
+            <span style="color:var(--violet)"><b>←</b> server frames</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- 01 -->
+      <section id="intro">
+        <div class="sec-num">01 / FOUNDATIONS</div>
+        <h2>What WebSockets actually are</h2>
+        <p class="lead">A WebSocket is a bidirectional, persistent communication channel over a single TCP connection, established by upgrading an HTTP request. After the upgrade, the HTTP semantics are gone — it's a lightweight framed message protocol.</p>
+
+        <div class="model">
+          <div class="lbl">The one-sentence model</div>
+          <p>Start with a normal HTTP request, ask the server to "upgrade" the connection, and if it agrees, the same TCP socket stays open as a two-way pipe — either side can send a message at any moment without a new request.</p>
+        </div>
+
+        <h3>The problem it solves</h3>
+        <p>Plain HTTP is <strong>client-initiated and request-response</strong>: the server can't speak unless asked. For real-time features (chat, live prices, notifications) you'd otherwise hammer the server with repeated requests (polling), wasting bandwidth and adding latency. WebSockets flip this: one connection, server can push instantly.</p>
+        <ul>
+          <li><strong>Full-duplex</strong> — both directions simultaneously, unlike request-response.</li>
+          <li><strong>Persistent</strong> — opened once, reused for the session (no repeated handshakes/headers).</li>
+          <li><strong>Low overhead</strong> — a few bytes of framing per message vs full HTTP headers each time.</li>
+          <li><strong>Low latency</strong> — no connection setup per message; the pipe is already open.</li>
+        </ul>
+
+        <h3>Core vocabulary</h3>
+        <dl class="vocab">
+          <dt>ws:// / wss://</dt><dd>The WebSocket URI schemes. <code>wss</code> = WebSocket over TLS (always use it in prod).</dd>
+          <dt>Upgrade handshake</dt><dd>The HTTP request that switches the connection from HTTP to WebSocket.</dd>
+          <dt>Frame</dt><dd>The unit of data after the handshake — text, binary, ping, pong, or close.</dd>
+          <dt>Full-duplex</dt><dd>Both sides can send at the same time, independently.</dd>
+          <dt>Heartbeat</dt><dd>Periodic ping/pong frames to keep the connection alive and detect dead peers.</dd>
+          <dt>Backplane</dt><dd>A pub/sub layer (Redis/Kafka) letting many WS servers broadcast to each other's clients.</dd>
+          <dt>Sticky session</dt><dd>Load-balancer setting pinning a client to the same server for the connection's life.</dd>
+        </dl>
+
+        <div class="warn">
+          <div class="lbl">First thing to say in an interview</div>
+          <p>"A WebSocket connection is <em>stateful</em> and long-lived — that single property is the source of every scaling and reliability challenge that follows." It frames the whole conversation.</p>
+        </div>
+      </section>
+
+      <!-- 02 -->
+      <section id="handshake">
+        <div class="sec-num">02 / FOUNDATIONS</div>
+        <h2>The handshake</h2>
+        <p class="lead">A WebSocket begins life as an ordinary HTTP/1.1 GET with special headers. The server agrees with a <code>101 Switching Protocols</code>, and from that instant the bytes on the wire are WebSocket frames, not HTTP.</p>
+
+        <h3>Client → Server (the upgrade request)</h3>
+        <pre><span class="k">GET</span> /socket HTTP/1.1
+Host: chat.app
+<span class="n">Upgrade</span>: websocket
+<span class="n">Connection</span>: Upgrade
+Sec-WebSocket-Key: <span class="s">dGhlIHNhbXBsZSBub25jZQ==</span>   <span class="c"># random base64 nonce</span>
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Protocol: chat.v1            <span class="c"># optional subprotocol</span></pre>
+
+        <h3>Server → Client (acceptance)</h3>
+        <pre>HTTP/1.1 <span class="n">101 Switching Protocols</span>
+<span class="n">Upgrade</span>: websocket
+<span class="n">Connection</span>: Upgrade
+Sec-WebSocket-Accept: <span class="s">s3pPLMBiTxaQ9kYGzzhZRbK+xOo=</span>  <span class="c"># = base64(sha1(key + magic GUID))</span></pre>
+
+        <p>The <code>Sec-WebSocket-Accept</code> value is derived from the client's key plus a fixed "magic string." This isn't security — it just proves both sides actually speak the WebSocket protocol and a confused HTTP cache/proxy didn't blunder in. After the 101, the TCP socket is repurposed for framed messages.</p>
+
+        <div class="model">
+          <div class="lbl">Why piggyback on HTTP at all?</div>
+          <p>Because port 80/443 and HTTP infrastructure (proxies, load balancers, firewalls) already exist everywhere. Upgrading from HTTP means WebSockets traverse the same paths as normal web traffic — especially over <code>wss</code>/443, which proxies tend to pass through untouched.</p>
+        </div>
+      </section>
+
+      <!-- 03 -->
+      <section id="frames">
+        <div class="sec-num">03 / FOUNDATIONS</div>
+        <h2>Frames & heartbeats</h2>
+        <p class="lead">After the handshake, data moves in small frames. Understanding frame types and heartbeats is what separates "I used the browser API" from "I understand the protocol."</p>
+
+        <h3>Frame types (opcodes)</h3>
+        <div class="grid g3">
+          <div class="card"><span class="pill c">data</span><h4>Text / Binary</h4><p>The actual payload. Text = UTF-8, Binary = raw bytes (e.g. protobuf, media).</p></div>
+          <div class="card"><span class="pill s">control</span><h4>Ping / Pong</h4><p>Heartbeats. A ping must be answered with a pong. Used to keep-alive and detect dead peers.</p></div>
+          <div class="card"><span class="pill s">control</span><h4>Close</h4><p>Graceful shutdown frame with a status code; both sides exchange it to close cleanly.</p></div>
+        </div>
+
+        <h3>Two protocol details that come up</h3>
+        <ul>
+          <li><strong>Masking</strong> — every client→server frame is XOR-masked with a random key. It's not encryption; it prevents certain cache-poisoning attacks against intermediaries. Server→client frames are not masked.</li>
+          <li><strong>Fragmentation</strong> — a large message can be split across multiple frames and reassembled, so you don't have to buffer a giant payload before sending.</li>
+        </ul>
+
+        <h3>Heartbeats — the part everyone forgets</h3>
+        <p>A WebSocket can silently die: a laptop sleeps, Wi-Fi drops, a NAT/load-balancer times out an idle connection. TCP won't always tell you quickly. So you send periodic <strong>ping</strong> frames and expect <strong>pong</strong> back within a timeout; no pong → assume dead, close, and (on the client) reconnect.</p>
+        <div class="warn">
+          <div class="lbl">Real production bug</div>
+          <p>Load balancers and proxies kill <em>idle</em> connections (often 60s). If your app is quiet, the LB silently drops the socket. Heartbeats every ~30s keep it "active" and surface death fast. Forgetting this = mysterious disconnects in prod.</p>
+        </div>
+      </section>
+
+      <!-- 04 PROTOCOLS -->
+      <section id="protocols">
+        <div class="sec-num">04 / THE BIG COMPARISON</div>
+        <h2>The real-time protocol family</h2>
+        <p class="lead">WebSockets are one of five ways to do "real-time" on the web. Interviewers love asking you to pick the right one — and the right answer is often <em>not</em> WebSockets. Toggle through them:</p>
+
+        <div class="proto">
+          <div class="proto-tabs" id="protoTabs">
+            <button data-p="sp">Short polling</button>
+            <button data-p="lp">Long polling</button>
+            <button data-p="sse">SSE</button>
+            <button data-p="ws" class="active">WebSocket</button>
+            <button data-p="rtc">WebRTC</button>
+          </div>
+          <div class="proto-body">
+            <div class="proto-desc" id="protoDesc"></div>
+            <div class="meters">
+              <div class="meter"><div class="mlbl"><span>Real-time freshness</span><span id="rtv"></span></div><div class="track"><div class="fill rt" id="rtf"></div></div></div>
+              <div class="meter"><div class="mlbl"><span>Server efficiency</span><span id="efv"></span></div><div class="track"><div class="fill ef" id="eff"></div></div></div>
+              <div class="meter"><div class="mlbl"><span>Bidirectional</span><span id="biv"></span></div><div class="track"><div class="fill bi" id="bif"></div></div></div>
+              <div class="meter"><div class="mlbl"><span>Simplicity</span><span id="smv"></span></div><div class="track"><div class="fill sm" id="smf"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="model">
+          <div class="lbl">The decision rule</div>
+          <p>Server-push only (feeds, notifications, live dashboards)? → <strong>SSE</strong> — simpler, auto-reconnects, runs over plain HTTP. True two-way, low-latency (chat, games, collab editing)? → <strong>WebSocket</strong>. Peer-to-peer media/low-latency between users (video calls)? → <strong>WebRTC</strong>. Infrequent, simple, don't-care-about-instant? → <strong>polling</strong>. Don't reach for WebSockets by default.</p>
+        </div>
+      </section>
+
+      <!-- 05 COMPARE -->
+      <section id="compare">
+        <div class="sec-num">05 / THE BIG COMPARISON</div>
+        <h2>WebSockets vs the alternatives</h2>
+        <p class="lead">The matrix, side by side. Filter by what you need:</p>
+        <div class="cmp-filter" id="cmpFilter">
+          <button data-c="all" class="active">All</button>
+          <button data-c="push">Server push only</button>
+          <button data-c="two">Bidirectional</button>
+          <button data-c="simple">Simple / HTTP-native</button>
+        </div>
+        <div class="table-scroll">
+          <table id="cmpTable">
+            <thead><tr><th>Protocol</th><th>Direction</th><th>Connection</th><th>Latency</th><th>Server cost</th><th>Best for</th></tr></thead>
+            <tbody>
+              <tr data-cat="simple"><td>Short polling</td><td>Client pulls</td><td class="x">New request each time</td><td>High (poll interval)</td><td>Wasteful</td><td>Cheap, infrequent updates; legacy support</td></tr>
+              <tr data-cat="simple"><td>Long polling</td><td>Client pulls, server holds</td><td>Held until data/timeout</td><td>Medium</td><td>Medium-high</td><td>Real-time-ish without WS; broad compatibility</td></tr>
+              <tr data-cat="push simple"><td>SSE</td><td class="y">Server → client only</td><td>One persistent HTTP stream</td><td>Low</td><td>Low</td><td>Feeds, notifications, live dashboards, log tails</td></tr>
+              <tr data-cat="two"><td>WebSocket</td><td class="y">Full-duplex</td><td>One persistent TCP socket</td><td>Very low</td><td>Stateful, moderate</td><td>Chat, games, collab editing, trading apps</td></tr>
+              <tr data-cat="two"><td>WebRTC</td><td class="y">Peer-to-peer duplex</td><td>P2P (UDP), server only signals</td><td>Lowest</td><td>Low (P2P) + signaling</td><td>Video/voice, screen share, P2P data</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>The conversations that come up</h3>
+        <div class="grid g2">
+          <div class="card"><h4>WebSocket vs SSE</h4><p>SSE is one-way (server→client), text-only, over plain HTTP, with <em>built-in auto-reconnect and event IDs</em>. WebSocket is two-way and binary-capable but you implement reconnection yourself. If the client rarely needs to send (and can use a normal POST when it does), SSE is simpler and often the better choice.</p></div>
+          <div class="card"><h4>WebSocket vs Long polling</h4><p>Long polling fakes push by holding a request open until there's data, then the client immediately re-requests. Works everywhere, but every message costs a full HTTP round-trip and re-connect. WebSockets keep one pipe open — far less overhead at high message rates.</p></div>
+          <div class="card"><h4>WebSocket vs WebRTC</h4><p>WebRTC is peer-to-peer over UDP for the lowest latency media — but needs signaling (often via WebSockets!), STUN/TURN for NAT traversal, and is complex. Use WebRTC for video/voice between users; WebSocket for client↔server messaging.</p></div>
+          <div class="card"><h4>Why not HTTP/2 push?</h4><p>Server Push was for pre-pushing page assets, not app messaging, and is effectively deprecated. It's not a real-time messaging transport — don't propose it.</p></div>
+        </div>
+      </section>
+
+      <!-- 06 SCALING -->
+      <section id="scaling">
+        <div class="sec-num">06 / GOING DEEP</div>
+        <h2>Scaling to millions of connections</h2>
+        <p class="lead">This is the heart of any WebSocket system-design round. The core difficulty: connections are <strong>stateful and long-lived</strong>, so you can't just round-robin requests across stateless servers like normal HTTP.</p>
+
+        <h3>The fan-out problem</h3>
+        <p>User A is connected to server-1. User B is connected to server-2. A sends a message for B. Server-1 holds no socket to B — so how does it reach B?</p>
+        <div class="model">
+          <div class="lbl">The answer: a pub/sub backplane</div>
+          <p>Servers don't talk to clients they don't hold. Instead, server-1 publishes the message to a shared <strong>pub/sub layer</strong> (Redis Pub/Sub, or Kafka for durability). Every WS server subscribes; server-2 receives it and pushes it down its socket to B. The backplane decouples "which server holds whom."</p>
+        </div>
+
+        <pre><span class="c">A (on server-1) → "hi B"</span>
+server-1  ── publish topic:userB ──▶  <span class="n">Redis / Kafka</span>  ──▶  server-2  ──▶  socket(B)
+                                          │
+                                          └── all WS servers subscribe</pre>
+
+        <h3>The pieces of a scalable WS layer</h3>
+        <ul>
+          <li><strong>Connection (gateway) tier</strong> — stateless-ish servers whose only job is holding sockets and (un)marshalling frames. Keep business logic out of here.</li>
+          <li><strong>Pub/sub backplane</strong> — Redis Pub/Sub (fast, fire-and-forget) or Kafka (durable, replayable) to route messages between servers.</li>
+          <li><strong>Connection registry / presence</strong> — a store (often Redis) mapping userId → which server holds them, for targeted routing and online/offline status.</li>
+          <li><strong>Load balancer</strong> — L4 (TCP) preferred for WS; supports the upgrade and long-lived connections. Use <strong>sticky sessions</strong> so a reconnect/upgrade stays on one server.</li>
+        </ul>
+
+        <h3>The per-server limits (C10K → C10M)</h3>
+        <p>One process can hold far more idle WebSockets than you'd think — but you hit real ceilings:</p>
+        <ul>
+          <li><strong>File descriptors</strong> — each connection is an open FD; tune <code>ulimit</code> / OS limits. The classic blocker.</li>
+          <li><strong>Memory per connection</strong> — buffers + app state. With efficient event-loop servers (Node, Netty, Go, epoll-based) you can hold 100k–1M idle connections per box; the limit is memory and FDs, not CPU when idle.</li>
+          <li><strong>CPU on message throughput</strong> — idle is cheap; serializing/broadcasting to many is what burns CPU. Fan-out amplification (one message → 100k sends) is the real cost.</li>
+          <li><strong>Horizontal scale</strong> — add gateway servers behind the LB; the backplane lets them cooperate. This is how you go from 100k to 10M.</li>
+        </ul>
+
+        <div class="warn">
+          <div class="lbl">Broadcast amplification trap</div>
+          <p>A "stock price" sent to 1M subscribers = 1M individual frame writes per tick. At high tick rates this melts servers. Mitigations: coalesce/batch updates (send every 200ms not every tick), shard subscribers across servers, and only send deltas.</p>
+        </div>
+      </section>
+
+      <!-- 07 FAILOVER -->
+      <section id="failover">
+        <div class="sec-num">07 / GOING DEEP</div>
+        <h2>Reliability & reconnection</h2>
+        <p class="lead">Connections <em>will</em> drop — networks flake, servers deploy, LBs time out. A production WebSocket system is defined by how gracefully it handles disconnects without losing messages.</p>
+
+        <h3>Detecting death</h3>
+        <p>Heartbeats (ping/pong) on a timer. No pong within the window → declare dead, clean up server-side state (free the FD, update presence), and the client triggers reconnect.</p>
+
+        <h3>Reconnection — done right</h3>
+        <ul>
+          <li><strong>Exponential backoff + jitter</strong> — don't retry instantly in a tight loop. Back off (1s, 2s, 4s…) with randomness so 1M clients don't reconnect in lockstep.</li>
+          <li><strong>Resume, don't restart</strong> — on reconnect, re-authenticate and re-subscribe to the rooms/channels the user was in.</li>
+        </ul>
+
+        <div class="warn">
+          <div class="lbl">The thundering-herd reconnect storm</div>
+          <p>Deploy a server holding 200k connections → all 200k reconnect at once → they stampede the remaining servers and the auth service, causing cascading failure. Fixes: jittered backoff, gradual connection draining on deploy, and rate-limiting reconnect/auth.</p>
+        </div>
+
+        <h3>Not losing messages across a drop</h3>
+        <p>WebSocket frames over TCP are in-order <em>within</em> a connection. But if the connection drops, messages sent during the gap are lost unless you plan for it:</p>
+        <ul>
+          <li><strong>Sequence numbers / message IDs</strong> — the client tracks the last id it saw; on reconnect it sends "I have up to id N."</li>
+          <li><strong>Catch-up</strong> — the server replays missed messages from a durable store (DB, or a Kafka log keyed by room) since id N, then resumes live delivery. This is exactly where a durable log behind the backplane earns its keep.</li>
+          <li><strong>Acks</strong> — for critical messages, the client acks receipt; unacked messages are re-sent.</li>
+        </ul>
+
+        <h3>Graceful deploys</h3>
+        <p>On shutdown, send a close frame, let the LB stop routing new connections (drain), and rely on client backoff to spread reconnects. Never just kill the process and dump every socket simultaneously.</p>
+      </section>
+
+      <!-- 08 SECURITY -->
+      <section id="security">
+        <div class="sec-num">08 / GOING DEEP</div>
+        <h2>Auth & security</h2>
+        <p class="lead">WebSockets have sharp edges around auth because the browser API is limited and the connection is long-lived.</p>
+
+        <h3>Authenticating the handshake</h3>
+        <div class="warn">
+          <div class="lbl">The browser limitation everyone trips on</div>
+          <p>The browser <code>WebSocket</code> API <strong>cannot set custom headers</strong> (no <code>Authorization: Bearer</code>). So you authenticate by: (1) a short-lived token in the <em>query string</em> (<code>wss://app/socket?token=...</code>), (2) the <code>Sec-WebSocket-Protocol</code> subprotocol header as a smuggle channel, or (3) an existing session <em>cookie</em> sent automatically on the handshake. Validate during the upgrade and reject before completing it.</p>
+        </div>
+
+        <h3>The other essentials</h3>
+        <ul>
+          <li><strong>Always <code>wss</code> (TLS)</strong> — encrypts frames and helps traverse proxies cleanly.</li>
+          <li><strong>Origin checking</strong> — verify the <code>Origin</code> header on the handshake to block cross-site WebSocket hijacking (CSWSH); CORS does <em>not</em> protect WebSockets.</li>
+          <li><strong>Authorization per message</strong> — auth at connect isn't enough; check the user is allowed to send to <em>this</em> room/channel on each message.</li>
+          <li><strong>Rate limiting & quotas</strong> — cap messages/sec and connections per user; a long-lived socket is a cheap DoS vector otherwise.</li>
+          <li><strong>Token expiry on long connections</strong> — a socket can outlive its token. Re-validate periodically or force reconnect on expiry.</li>
+        </ul>
+      </section>
+
+      <!-- 09 TRADEOFFS -->
+      <section id="tradeoffs">
+        <div class="sec-num">09 / GOING DEEP</div>
+        <h2>The tradeoffs, named</h2>
+        <p class="lead">Name the axis. That's what makes an answer sound senior.</p>
+        <dl class="vocab">
+          <dt>Stateful ↔ Scalable</dt><dd>Persistent connections give low latency but pin state to servers — needing sticky sessions, a backplane, and presence tracking. Stateless HTTP scales more trivially.</dd>
+          <dt>Push freshness ↔ Server cost</dt><dd>Holding millions of open sockets costs FDs/memory even when idle. Polling is stateless but wastes requests. Pick per traffic pattern.</dd>
+          <dt>Bidirectional ↔ Simplicity</dt><dd>WebSocket gives two-way but you own reconnection, heartbeats, auth quirks. SSE/polling are simpler when you don't need true duplex.</dd>
+          <dt>Latency ↔ Reliability</dt><dd>Fire-and-forget (Redis pub/sub) is fast but can drop on the gap; durable replay (Kafka) guarantees catch-up but adds latency/complexity.</dd>
+          <dt>Broadcast reach ↔ CPU</dt><dd>Fan-out to many subscribers amplifies one message into N writes. Batch/coalesce to protect servers.</dd>
+          <dt>Connection limits ↔ Cost</dt><dd>More connections per box = cheaper, but raises blast radius when that box dies (more reconnects at once).</dd>
+        </dl>
+        <div class="model">
+          <div class="lbl">When NOT to use WebSockets</div>
+          <p>One-way updates → SSE. Rare/occasional updates → polling. Request-response that happens to be frequent → just HTTP/2. Reaching for WebSockets when you don't need duplex adds statefulness and ops burden for no benefit. Saying this unprompted scores points.</p>
+        </div>
+      </section>
+
+      <!-- 10 USECASES -->
+      <section id="usecases">
+        <div class="sec-num">10 / APPLIED</div>
+        <h2>Use cases & reference architecture</h2>
+        <p class="lead">Match the use case to "why duplex / why persistent" — that's the justification interviewers want.</p>
+        <div class="grid g2">
+          <div class="card"><h4>Chat & messaging</h4><p>WhatsApp/Slack-style. Two-way, presence, typing indicators, delivery acks. The canonical WebSocket system-design problem.</p></div>
+          <div class="card"><h4>Live trading / price tickers</h4><p>Server pushes price updates at high frequency; client can place orders on the same pipe. Low latency is the whole point (Zerodha-style).</p></div>
+          <div class="card"><h4>Collaborative editing</h4><p>Google-Docs-style. Rapid bidirectional ops (cursor, edits) needing low latency and ordering per document.</p></div>
+          <div class="card"><h4>Live dashboards & notifications</h4><p>Often SSE is enough (server→client only). Use WS only if the client must also send frequently.</p></div>
+          <div class="card"><h4>Multiplayer games</h4><p>Fast state sync. Sometimes WebSocket for lobby/state, WebRTC/UDP for the latency-critical game loop.</p></div>
+          <div class="card"><h4>Live sports / auctions</h4><p>Real-time scores, bids. Fan-out heavy — batch updates to avoid broadcast amplification.</p></div>
+        </div>
+
+        <h3>Reference architecture for a chat backbone</h3>
+        <pre>clients ──wss──▶ <span class="n">L4 LB (sticky)</span> ──▶ [ WS gateway servers (hold sockets) ]
+                                              │            ▲
+                              publish/subscribe│            │push
+                                              ▼            │
+                                   <span class="n">Redis Pub/Sub  /  Kafka</span>  ◀── message/persistence service
+                                              │
+        presence (userId→server) ◀── Redis    └── durable msg log (catch-up on reconnect)</pre>
+        <p>Gateway tier holds connections and is dumb. A message service handles persistence, ordering, and history. The backplane routes between gateways. Presence in Redis answers "is user online / which server." On reconnect, the client catches up from the durable log via last-seen message id.</p>
+
+        <div class="model">
+          <div class="lbl">Tie-in to your stack</div>
+          <p>This is the same shape as the Kafka doc's "real-time event stream" — the WS gateway is the edge, and a durable log (Kafka) behind the backplane is what makes reconnection lossless. The two technologies compose: WebSockets at the edge, Kafka for durability/fan-out.</p>
+        </div>
+      </section>
+
+      <!-- 11 QUESTIONS -->
+      <section id="questions">
+        <div class="sec-num">11 / INTERVIEW</div>
+        <h2>Scenario & concept questions</h2>
+        <p class="lead">Click any question to reveal a model answer. Filter by type.</p>
+        <div class="qfilter" id="qFilter">
+          <button data-q="all" class="active">All</button>
+          <button data-q="scn">Scenario</button>
+          <button data-q="cnc">Concept</button>
+          <button data-q="cor">Gotcha / correctness</button>
+        </div>
+        <div id="qList"></div>
+      </section>
+
+      <!-- 12 QUIZ -->
+      <section id="quiz">
+        <div class="sec-num">12 / INTERVIEW</div>
+        <h2>Rapid-fire flashcards</h2>
+        <p class="lead">Answer out loud before revealing. Shuffle and repeat until each is instant.</p>
+        <div class="quiz">
+          <div class="quiz-prog" id="qProg"></div>
+          <div class="quiz-q" id="qQ"></div>
+          <div class="quiz-card" id="qCard"><div class="quiz-a hidden-a" id="qA">Tap to reveal answer</div></div>
+          <div class="quiz-ctrls">
+            <button id="qPrev">← Prev</button>
+            <button class="primary" id="qReveal">Reveal</button>
+            <button id="qNext">Next →</button>
+            <button id="qShuffle">⤮ Shuffle</button>
+          </div>
+        </div>
+        <p class="footnote">Part of your SDE-2 prep series. Core idea: a WebSocket is one persistent full-duplex connection — and its stateful, long-lived nature is the root of every scaling and reliability problem.</p>
+        <a href="#intro" class="toplink">↑ back to top</a>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+/* full-duplex animated pipe */
+(function(){
+  const pipe = document.getElementById('pipe');
+  if(!pipe) return;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cMsgs = ['send','typing…','msg #42','ack'];
+  const sMsgs = ['new msg','presence','pong','msg #43'];
+  function fire(dir){
+    const f = document.createElement('div');
+    f.className = 'frame ' + dir;
+    f.textContent = (dir==='c2s'? '▶ ':'◀ ') + (dir==='c2s'? cMsgs[Math.floor(Math.random()*cMsgs.length)] : sMsgs[Math.floor(Math.random()*sMsgs.length)]);
+    pipe.appendChild(f);
+    setTimeout(()=>f.remove(), 2700);
+  }
+  fire('c2s'); setTimeout(()=>fire('s2c'),900);
+  if(!reduced){
+    setInterval(()=>fire('c2s'), 2300);
+    setTimeout(()=>setInterval(()=>fire('s2c'), 2300), 1100);
+  }
+})();
+
+/* scrollspy */
+(function(){
+  const links = Array.from(document.querySelectorAll('#nav a'));
+  const map = {}; links.forEach(l=>map[l.getAttribute('href').slice(1)]=l);
+  const obs = new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){ links.forEach(l=>l.classList.remove('active')); const a=map[e.target.id]; if(a)a.classList.add('active'); }
+  }), {rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section').forEach(s=>obs.observe(s));
+  links.forEach(l=>l.addEventListener('click',()=>document.getElementById('sb').classList.remove('open')));
+})();
+
+/* protocol picker */
+(function(){
+  const data = {
+    sp:{title:'Short polling', desc:'Client repeatedly asks "anything new?" on a fixed interval (e.g. every 5s). Dead simple, works everywhere, but most requests return nothing — wasted bandwidth — and updates are stale by up to one interval.', rt:25, ef:18, bi:45, sm:96},
+    lp:{title:'Long polling', desc:'Client sends a request; the server holds it open until there is data (or a timeout), then responds and the client immediately re-requests. Feels real-time without WebSockets, but each message is a full HTTP round-trip + reconnect.', rt:62, ef:42, bi:45, sm:68},
+    sse:{title:'Server-Sent Events (SSE)', desc:'One long-lived HTTP stream, server pushes text events one-way to the client. Built-in auto-reconnect and event IDs (Last-Event-ID). Simple and efficient — but server→client only and text-only.', rt:85, ef:80, bi:14, sm:74},
+    ws:{title:'WebSocket', desc:'One persistent TCP socket, full-duplex, text or binary, very low overhead and latency. The most capable — but stateful, and you implement reconnection, heartbeats, and auth quirks yourself.', rt:97, ef:84, bi:100, sm:48},
+    rtc:{title:'WebRTC', desc:'Peer-to-peer over UDP for the lowest possible latency (media, data). Server only does signaling. Most powerful for real-time media, but the most complex: needs signaling, STUN/TURN for NAT traversal.', rt:99, ef:70, bi:100, sm:14}
+  };
+  const tabs=document.getElementById('protoTabs'), desc=document.getElementById('protoDesc');
+  function lab(v){return v<25?'low':v<55?'medium':v<82?'high':'very high';}
+  function set(p){
+    const d=data[p];
+    desc.innerHTML='<h4>'+d.title+'</h4><p>'+d.desc+'</p>';
+    [['rt',d.rt],['ef',d.ef],['bi',d.bi],['sm',d.sm]].forEach(([k,v])=>{
+      document.getElementById(k+'f').style.width=v+'%';
+      document.getElementById(k+'v').textContent=k==='bi'?(v>70?'full':v>30?'partial':'one-way'):lab(v);
+    });
+    Array.from(tabs.children).forEach(b=>b.classList.toggle('active',b.dataset.p===p));
+  }
+  tabs.addEventListener('click',e=>{if(e.target.dataset.p)set(e.target.dataset.p);});
+  set('ws');
+})();
+
+/* comparison filter */
+(function(){
+  const f=document.getElementById('cmpFilter'), rows=Array.from(document.querySelectorAll('#cmpTable tbody tr'));
+  f.addEventListener('click',e=>{const c=e.target.dataset.c;if(!c)return;
+    Array.from(f.children).forEach(b=>b.classList.toggle('active',b===e.target));
+    rows.forEach(r=>r.style.display=(c==='all'||r.dataset.cat.includes(c))?'':'none');
+  });
+})();
+
+/* Q&A */
+const QA=[
+ {t:'scn',q:'Design the backbone of a chat app (WhatsApp/Slack-style). What are the components?',
+  a:'A <strong>WS gateway tier</strong> holds client sockets (sticky LB at L4). A <strong>pub/sub backplane</strong> (Redis Pub/Sub for speed, Kafka for durability) routes messages between gateways so users on different servers reach each other. A <strong>presence service</strong> (Redis) tracks userId→server and online status. A <strong>message service + durable store</strong> handles persistence, ordering per conversation, and history. Flow: A→gateway1→backplane→gateway2→B. On reconnect, the client catches up from the durable log via last-seen message id. Keep gateways dumb; business logic lives behind them.'},
+ {t:'scn',q:'How do you scale WebSockets to 1 million concurrent connections?',
+  a:'Horizontally. (1) Multiple gateway servers behind an L4 load balancer with sticky sessions. (2) Each box holds 100k–1M idle sockets — tune file descriptor limits (ulimit), use an event-loop/epoll server (Netty/Go/Node), watch memory per connection. (3) A pub/sub backplane (Redis/Kafka) lets servers cooperate so any server can deliver to any user. (4) A presence registry maps users to servers. (5) Guard against broadcast amplification by batching/coalescing fan-out. The limit is FDs + memory + fan-out CPU, not idle CPU.'},
+ {t:'scn',q:'User A is on server-1, user B on server-2. How does A\'s message reach B?',
+  a:'Server-1 holds no socket to B, so it can\'t deliver directly. It publishes the message to a shared pub/sub backplane (Redis Pub/Sub or a Kafka topic). All gateway servers subscribe; server-2 receives it and writes it to B\'s socket. A presence/registry (userId→server) can make this targeted instead of broadcast. The backplane is what decouples "which server holds whom."'},
+ {t:'scn',q:'How do you guarantee a user doesn\'t lose messages when their connection drops?',
+  a:'Persist messages in a durable store/log (keyed by conversation/room). The client tracks the last message id it received. On reconnect, it sends "I have up to id N"; the server replays everything after N from the store, then resumes live delivery. For critical messages add client acks and re-send unacked ones. A Kafka log behind the backplane makes this catch-up clean and replayable.'},
+ {t:'scn',q:'You deploy a server holding 200k connections. What happens and how do you handle it?',
+  a:'All 200k clients disconnect and try to reconnect — a thundering herd that can overwhelm the remaining servers and the auth service (cascading failure). Mitigate with: exponential backoff + jitter on the client (so reconnects spread out), graceful connection draining on deploy (stop routing new connections, send close frames, let clients migrate gradually), and rate-limiting on reconnect/auth. Rolling deploys with small batches help too.'},
+ {t:'scn',q:'A live price feed must push to 1M subscribers many times per second. Concerns?',
+  a:'Broadcast amplification: one tick → 1M socket writes, repeated per tick, melts CPU/network. Fixes: coalesce updates (push at a fixed cadence like every 200ms, not every tick), send deltas not full snapshots, shard subscribers across gateway servers so no single box fans out to all, and consider SSE if clients only receive (cheaper, auto-reconnect). Backpressure: drop or throttle for slow consumers rather than unbounded buffering.'},
+ {t:'cnc',q:'Walk me through the WebSocket handshake.',
+  a:'It starts as an HTTP/1.1 GET with Upgrade: websocket, Connection: Upgrade, a random Sec-WebSocket-Key, and version 13. If the server agrees it returns 101 Switching Protocols with Sec-WebSocket-Accept = base64(sha1(key + magic GUID)) — proving both sides speak the protocol. After 101, the same TCP socket carries WebSocket frames, not HTTP. Piggybacking on HTTP lets it reuse ports 80/443 and existing proxy/LB infrastructure.'},
+ {t:'cnc',q:'WebSocket vs SSE — when would you pick each?',
+  a:'SSE: server→client only, text, over plain HTTP, with built-in auto-reconnect and event IDs — simpler. Pick it for feeds, notifications, live dashboards where the client rarely sends (and can POST when it does). WebSocket: full-duplex, binary-capable, lowest overhead — pick it for chat, games, collaborative editing, trading where the client sends frequently and latency matters. Default to the simpler SSE unless you truly need two-way.'},
+ {t:'cnc',q:'What are heartbeats and why do they matter?',
+  a:'Periodic ping/pong control frames. They serve two purposes: (1) keep the connection alive so idle-timeout proxies/load balancers (often 60s) don\'t silently drop it, and (2) detect a dead peer fast — no pong within the timeout means assume dead, clean up server state, and reconnect on the client. Without heartbeats you get mysterious disconnects and zombie connections holding FDs.'},
+ {t:'cnc',q:'Why do WebSockets start as HTTP instead of a fresh protocol?',
+  a:'To reuse existing web infrastructure: ports 80/443, proxies, load balancers, and firewalls already handle HTTP. Starting as an HTTP Upgrade means WebSockets travel the same paths as web traffic — especially over wss/443 (TLS), which intermediaries tend to tunnel through untouched. A brand-new port/protocol would be blocked by corporate firewalls everywhere.'},
+ {t:'cor',q:'Why can\'t you just put an Authorization: Bearer header on a browser WebSocket?',
+  a:'The browser WebSocket API does not allow setting custom request headers on the handshake. So you authenticate via: a short-lived token in the query string (wss://app/socket?token=...), the Sec-WebSocket-Protocol subprotocol header as a channel, or an existing session cookie (sent automatically). Validate during the upgrade and reject before completing the handshake. Query-string tokens should be short-lived since URLs can leak into logs.'},
+ {t:'cor',q:'Does the WebSocket protocol automatically reconnect after a drop?',
+  a:'No. WebSockets have no built-in reconnection — that\'s your responsibility. You implement reconnect with exponential backoff + jitter, re-authenticate, re-subscribe to rooms, and catch up missed messages via last-seen id. (SSE, by contrast, does auto-reconnect with Last-Event-ID — a reason to prefer SSE when one-way suffices.)'},
+ {t:'cor',q:'Does CORS protect a WebSocket endpoint?',
+  a:'No. The same-origin policy / CORS does not apply to WebSocket handshakes, so any origin can attempt to connect — that\'s Cross-Site WebSocket Hijacking (CSWSH). You must explicitly check the Origin header on the handshake and authenticate the connection. Relying on cookies alone without origin checks is the classic vulnerability.'},
+ {t:'cor',q:'Are messages guaranteed in order and delivered exactly once over a WebSocket?',
+  a:'Within a single connection, frames are in-order (it\'s TCP). But across a reconnect, ordering and delivery are not guaranteed — messages during the gap can be lost or, on retransmit, duplicated. For end-to-end ordering/once-only you add application-level sequence numbers, a durable log for catch-up, and idempotent handling of replayed messages.'},
+ {t:'cor',q:'Why is L4 load balancing usually preferred over L7 for WebSockets?',
+  a:'L4 (TCP) load balancing passes the connection through transparently, which suits the long-lived, upgraded socket and avoids the LB trying to interpret/buffer a non-HTTP stream. L7 can work (and is needed for path-based routing/TLS termination) but must explicitly support the Upgrade and not impose short idle timeouts. Either way you want sticky sessions so a connection stays pinned to one server.'}
+];
+(function(){
+  const list=document.getElementById('qList');
+  const badge={scn:['b-scn','Scenario'],cnc:['b-cnc','Concept'],cor:['b-cor','Gotcha']};
+  function render(f){
+    list.innerHTML='';
+    QA.filter(i=>f==='all'||i.t===f).forEach(i=>{
+      const b=badge[i.t], d=document.createElement('details');
+      d.className='qa';
+      d.innerHTML='<summary><span class="qbadge '+b[0]+'">'+b[1]+'</span><span>'+i.q+'</span><span class="arw">›</span></summary><div class="ans">'+i.a+'</div>';
+      list.appendChild(d);
+    });
+  }
+  const f=document.getElementById('qFilter');
+  f.addEventListener('click',e=>{const q=e.target.dataset.q;if(!q)return;
+    Array.from(f.children).forEach(b=>b.classList.toggle('active',b===e.target));render(q);});
+  render('all');
+})();
+
+/* flashcards */
+(function(){
+  let cards=[
+    {q:'In one sentence, what is a WebSocket?',a:'A single, persistent, full-duplex connection over one TCP socket, started via an HTTP upgrade.'},
+    {q:'What HTTP status code completes the WebSocket handshake?',a:'101 Switching Protocols.'},
+    {q:'Why does the browser limit WebSocket auth options?',a:'The WS API can\'t set custom headers → use query-string token, subprotocol, or cookie.'},
+    {q:'What is the fan-out problem and its solution?',a:'Users on different servers can\'t reach each other directly → a pub/sub backplane (Redis/Kafka) routes between servers.'},
+    {q:'What\'s the purpose of ping/pong heartbeats?',a:'Keep idle connections alive past LB timeouts and detect dead peers quickly.'},
+    {q:'Pick: server-push-only notifications. Which protocol?',a:'SSE — one-way, HTTP-native, auto-reconnects, simpler than WebSockets.'},
+    {q:'Does a WebSocket auto-reconnect?',a:'No — you implement reconnection (backoff + jitter, re-auth, re-subscribe, catch-up).'},
+    {q:'Per-server scaling ceiling for connections?',a:'File descriptors and memory per connection — not idle CPU.'},
+    {q:'How do you not lose messages across a disconnect?',a:'Durable log + client tracks last message id + replay-since-N on reconnect.'},
+    {q:'What is a thundering-herd reconnect storm?',a:'A server holding many connections dies → all clients reconnect at once, overwhelming others. Fix: jittered backoff + draining.'},
+    {q:'Does CORS protect WebSocket endpoints?',a:'No — you must check the Origin header (CSWSH risk).'},
+    {q:'WebSocket vs WebRTC?',a:'WS = client↔server messaging over TCP; WebRTC = P2P over UDP for media, needs signaling + STUN/TURN.'},
+    {q:'What is the backplane in a WS architecture?',a:'A pub/sub layer (Redis/Kafka) that lets multiple gateway servers deliver to each other\'s clients.'},
+    {q:'L4 vs L7 LB for WebSockets — preference?',a:'L4 (TCP) passes the upgraded socket transparently; use sticky sessions either way.'},
+    {q:'Broadcast amplification — what and fix?',a:'One message → N socket writes; fix by batching/coalescing, deltas, sharding subscribers.'},
+    {q:'Always use ws:// or wss:// in production?',a:'wss:// — TLS-encrypted and traverses proxies cleanly.'}
+  ];
+  let i=0,rev=false;
+  const qEl=document.getElementById('qQ'),aEl=document.getElementById('qA'),pEl=document.getElementById('qProg');
+  function show(){qEl.textContent=cards[i].q;aEl.textContent='Tap to reveal answer';aEl.className='quiz-a hidden-a';rev=false;pEl.textContent='Card '+(i+1)+' / '+cards.length;}
+  function reveal(){aEl.textContent=cards[i].a;aEl.className='quiz-a show';rev=true;}
+  document.getElementById('qReveal').addEventListener('click',()=>rev?show():reveal());
+  document.getElementById('qCard').addEventListener('click',()=>{if(!rev)reveal();});
+  document.getElementById('qNext').addEventListener('click',()=>{i=(i+1)%cards.length;show();});
+  document.getElementById('qPrev').addEventListener('click',()=>{i=(i-1+cards.length)%cards.length;show();});
+  document.getElementById('qShuffle').addEventListener('click',()=>{for(let k=cards.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[cards[k],cards[j]]=[cards[j],cards[k]];}i=0;show();});
+  show();
+})();
+</script>
+</body>
+</html>
