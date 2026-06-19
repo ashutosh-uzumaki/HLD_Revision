@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 0 → 100 — Learn It Properly</title>
+<style>
+:root{
+  --ink:#0C1413;--panel:#101B1A;--panel-2:#16201F;--raise:#1B2A28;--line-s:#26433f;--hair:#22302e;
+  --text:#DBE7E3;--muted:#82968F;--faint:#5d6f6a;
+  --solid:#41D196;--shaky:#F4C04E;--review:#EC6452;--accent:#34C9C2;--accent-ink:#08201f;
+  --b1:#34C9C2;--b2:#7C8CF8;--b3:#F2A65A;--b4:#E26EC5;--b5:#9BD64A;--b6:#F4C04E;--b7:#5FD0E0;--b8:#EC6452;
+  --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --r:10px;--r-s:6px;--sh:0 1px 0 rgba(255,255,255,.02),0 8px 24px -12px rgba(0,0,0,.6);
+}
+html[data-theme="light"]{
+  --ink:#F2F0E9;--panel:#FBFAF6;--panel-2:#F5F3EC;--raise:#FFFFFF;--line-s:#dfdcd0;--hair:#e6e3d8;
+  --text:#1c2624;--muted:#5d6b66;--faint:#8a958f;
+  --solid:#1a9f6c;--shaky:#b07d12;--review:#c8442f;--accent:#0c8f88;--accent-ink:#ffffff;
+  --sh:0 1px 2px rgba(20,30,28,.06),0 10px 28px -18px rgba(20,30,28,.25);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--ink);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.62;
+  -webkit-font-smoothing:antialiased;display:flex;flex-direction:column;min-height:100vh}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+::selection{background:color-mix(in srgb,var(--accent) 35%,transparent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* header */
+header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:16px;padding:11px 20px;
+  background:color-mix(in srgb,var(--ink) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--hair)}
+.brand{display:flex;align-items:center;gap:11px;min-width:0;flex-shrink:0}
+.logo{width:30px;height:30px;flex:none;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:2px}
+.logo i{background:var(--accent);border-radius:1.5px;opacity:.32}
+.logo i:nth-child(1),.logo i:nth-child(5),.logo i:nth-child(9){opacity:1}
+.logo i:nth-child(3),.logo i:nth-child(7){opacity:.62}
+.brand b{font-size:14px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+.brand b small{display:block;font:500 10.5px/1.3 var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.levelwrap{flex:1;display:flex;align-items:center;gap:12px;max-width:520px;margin:0 auto}
+.levelwrap .lv{font:700 12px/1 var(--mono);color:var(--accent);white-space:nowrap}
+.track{flex:1;height:9px;background:var(--panel);border:1px solid var(--hair);border-radius:99px;overflow:hidden;position:relative}
+.fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--solid));width:0;transition:width .5s ease}
+.icon-btn{background:var(--panel);border:1px solid var(--hair);color:var(--muted);width:36px;height:36px;
+  border-radius:var(--r-s);cursor:pointer;display:grid;place-items:center;flex:none}
+.icon-btn:hover{color:var(--text);border-color:var(--line-s)}
+.menu-btn{display:none}
+
+main{flex:1;width:100%;max-width:1280px;margin:0 auto;padding:0 20px;display:grid;
+  grid-template-columns:280px 1fr;gap:34px;align-items:start}
+/* sidebar */
+.coursenav{position:sticky;top:70px;max-height:calc(100vh - 90px);overflow:auto;padding:18px 6px 40px 0;font-size:13.5px}
+.homebtn{width:100%;text-align:left;background:var(--panel);border:1px solid var(--hair);color:var(--text);
+  padding:11px 13px;border-radius:var(--r-s);cursor:pointer;font:600 13px var(--sans);margin-bottom:16px;
+  display:flex;align-items:center;gap:9px}
+.homebtn:hover{border-color:var(--line-s)}
+.stagegrp{margin-bottom:14px}
+.stagehd{font:700 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
+  padding:8px 8px;display:flex;justify-content:space-between;align-items:center}
+.stagehd .rng{color:var(--faint)}
+.lrow{display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:var(--r-s);cursor:pointer;
+  color:var(--muted);border-left:2px solid transparent;line-height:1.35}
+.lrow:hover{background:var(--panel);color:var(--text)}
+.lrow.cur{background:var(--panel);color:var(--text);border-left-color:var(--accent)}
+.lrow.locked{opacity:.45;cursor:not-allowed}
+.lrow.locked:hover{background:none;color:var(--muted)}
+.tick{width:18px;height:18px;flex:none;border-radius:50%;border:1.5px solid var(--hair);display:grid;place-items:center;
+  font:700 10px/1 var(--mono);color:var(--faint)}
+.lrow.done .tick{background:var(--solid);border-color:var(--solid);color:var(--accent-ink)}
+.lrow.cur .tick{border-color:var(--accent);color:var(--accent)}
+
+#content{min-width:0;padding:22px 0 70px}
+
+/* roadmap */
+.road-hero{margin-bottom:26px}
+.road-hero h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 8px;line-height:1.12}
+.road-hero p{color:var(--muted);margin:0 0 18px;max-width:60ch}
+.continue{font:700 14px var(--sans);background:var(--accent);color:var(--accent-ink);border:0;
+  padding:13px 22px;border-radius:var(--r-s);cursor:pointer}
+.continue:hover{filter:brightness(1.08)}
+.stages{display:flex;flex-direction:column;gap:14px}
+.stagecard{background:var(--panel);border:1px solid var(--hair);border-radius:var(--r);padding:18px 20px}
+.stagecard .top{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.stagecard .num{font:800 13px/1 var(--mono);color:var(--accent-ink);background:var(--accent);padding:6px 9px;border-radius:var(--r-s)}
+.stagecard h3{margin:0;font-size:17px;font-weight:700}
+.stagecard .meta{margin-left:auto;font:600 11px/1 var(--mono);color:var(--muted)}
+.stagecard .sub{color:var(--muted);font-size:13.5px;margin:2px 0 12px}
+.stagebar{height:6px;background:var(--ink);border-radius:99px;overflow:hidden}
+.stagebar i{display:block;height:100%;background:var(--solid);width:0;transition:width .5s}
+
+/* lesson */
+.lhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.pill{font:600 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:5px 9px;border-radius:99px}
+.pill.stage{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.pill.lv{color:var(--shaky);background:color-mix(in srgb,var(--shaky) 14%,transparent)}
+.pill.done{color:var(--solid);background:color-mix(in srgb,var(--solid) 16%,transparent)}
+.lesson h2.lt{font-size:27px;font-weight:800;letter-spacing:-.02em;margin:6px 0 6px;line-height:1.15}
+.hook{font-size:16px;color:var(--text);font-style:italic;border-left:3px solid var(--accent);padding:2px 0 2px 16px;margin:10px 0 22px;color:var(--muted)}
+.body{max-width:760px}
+.body p{margin:13px 0}
+.body ul,.body ol{margin:12px 0;padding-left:22px}.body li{margin:5px 0}
+.body strong{color:var(--text);font-weight:700}
+.body blockquote{margin:18px 0;padding:10px 18px;border-left:3px solid var(--shaky);background:var(--panel);
+  border-radius:0 var(--r-s) var(--r-s) 0;color:var(--text)}
+.body code{font-family:var(--mono);font-size:.85em;background:var(--panel-2);padding:.12em .4em;border-radius:4px;border:1px solid var(--hair)}
+.body pre{background:var(--panel);border:1px solid var(--hair);border-radius:var(--r);padding:15px 16px;overflow:auto;margin:16px 0;line-height:1.5}
+.body pre code{background:none;border:0;padding:0;font-size:12.5px;white-space:pre}
+.body table{border-collapse:collapse;width:100%;margin:18px 0;font-size:13.5px;display:block;overflow:auto}
+.body th,.body td{border:1px solid var(--hair);padding:8px 11px;text-align:left;vertical-align:top}
+.body th{background:var(--panel);font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+
+/* simulator shell */
+.sim{background:var(--panel);border:1px solid var(--line-s);border-radius:var(--r);padding:18px;margin:22px 0;max-width:760px}
+.sim .simhd{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+.sim .simhd .tag{font:700 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);padding:4px 7px;border-radius:4px}
+.sim .simhd h4{margin:0;font-size:14px}
+.sim .simsub{color:var(--muted);font-size:12.5px;margin:2px 0 14px}
+.ctrls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.ctrls button{font:600 12px var(--sans);padding:9px 13px;border-radius:var(--r-s);border:1px solid var(--hair);
+  background:var(--raise);color:var(--text);cursor:pointer}
+.ctrls button:hover{border-color:var(--line-s)}
+.ctrls button.danger{color:var(--review);border-color:color-mix(in srgb,var(--review) 40%,var(--hair))}
+.ctrls button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ctrls button:disabled{opacity:.4;cursor:not-allowed}
+.ctrls label{font:600 11px/1 var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px}
+.ctrls select,.ctrls input[type=range]{accent-color:var(--accent)}
+.ctrls select{background:var(--raise);color:var(--text);border:1px solid var(--hair);border-radius:5px;padding:6px 8px;font:600 12px var(--mono)}
+.simstage{min-height:60px}
+.log-strip{display:flex;gap:5px;flex-wrap:wrap;align-items:flex-end;margin:6px 0 4px}
+.cell{min-width:54px;border:1px solid var(--line-s);border-radius:6px;padding:7px 8px;background:var(--ink);position:relative}
+.cell .off{font:700 9px/1 var(--mono);color:var(--faint)}
+.cell .kv{font:600 12px/1.2 var(--mono);margin-top:3px;white-space:nowrap}
+.cell .kv .k{color:var(--accent)}
+.gptrs{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
+.gptr{font:600 12px var(--mono)}
+.gptr b{color:var(--accent)}
+.simout{font:600 12px/1.6 var(--mono);color:var(--muted);background:var(--ink);border:1px solid var(--hair);
+  border-radius:var(--r-s);padding:10px 12px;margin-top:12px;min-height:38px;max-height:120px;overflow:auto;white-space:pre-wrap}
+.note{font-size:12.5px;color:var(--muted);margin-top:12px;border-top:1px dashed var(--line-s);padding-top:10px}
+.note b{color:var(--text)}
+.parts{display:flex;gap:7px;flex-wrap:wrap}
+.pbox{flex:1;min-width:70px;border:1px solid var(--hair);border-radius:6px;padding:9px;text-align:center;background:var(--ink);transition:.2s}
+.pbox .pl{font:700 10px/1 var(--mono);color:var(--faint)}
+.pbox .po{font:700 13px/1 var(--mono);margin-top:5px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.cchip{font:700 11px/1 var(--mono);padding:8px 11px;border-radius:99px;color:#0c1413;display:flex;align-items:center;gap:6px}
+.cchip.idle{background:var(--hair)!important;color:var(--faint);text-decoration:line-through}
+.brokers{display:flex;gap:10px;flex-wrap:wrap}
+.broker{flex:1;min-width:120px;border:1px solid var(--line-s);border-radius:var(--r-s);padding:12px;background:var(--ink);text-align:center;transition:.25s}
+.broker.dead{opacity:.35;border-style:dashed}
+.broker .bn{font:700 12px/1 var(--mono)}
+.broker .role{font:600 9px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-top:5px}
+.broker.leader .role{color:var(--accent)}.broker.follower .role{color:var(--muted)}
+.broker .cnt{font:800 20px/1 var(--mono);margin-top:8px}
+.broker .isr{font:600 9px/1 var(--mono);margin-top:5px}
+.broker.insync .isr{color:var(--solid)}.broker.outsync .isr{color:var(--review)}
+
+/* checks */
+.checks{max-width:760px;margin-top:8px}
+.checks .chd{font:700 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px;display:flex;align-items:center;gap:9px}
+.check{background:var(--panel);border:1px solid var(--hair);border-radius:var(--r);padding:18px;margin-bottom:12px}
+.check.passed{border-color:var(--solid)}
+.check .q{font-size:15px;font-weight:600;margin-bottom:12px}
+.opt{display:block;width:100%;text-align:left;background:var(--ink);border:1px solid var(--hair);color:var(--text);
+  padding:11px 13px;border-radius:var(--r-s);margin:7px 0;cursor:pointer;font:500 13.5px var(--sans);display:flex;gap:10px;align-items:center}
+.opt .m{font:700 10px/1 var(--mono);width:20px;height:20px;flex:none;border-radius:5px;border:1px solid var(--hair);display:grid;place-items:center;color:var(--muted)}
+.opt:hover:not(:disabled){border-color:var(--line-s)}
+.opt.correct{border-color:var(--solid);background:color-mix(in srgb,var(--solid) 12%,transparent)}
+.opt.correct .m{background:var(--solid);color:var(--accent-ink);border-color:var(--solid)}
+.opt.wrong{border-color:var(--review);background:color-mix(in srgb,var(--review) 12%,transparent)}
+.opt.wrong .m{background:var(--review);color:#fff;border-color:var(--review)}
+.why{margin-top:11px;font-size:13px;color:var(--muted);background:var(--ink);border:1px solid var(--hair);
+  border-left:3px solid var(--accent);border-radius:var(--r-s);padding:11px 13px;display:none}
+.why.show{display:block}.why b{color:var(--text)}
+
+.lfoot{display:flex;align-items:center;gap:12px;margin-top:30px;max-width:760px;flex-wrap:wrap}
+.navbtn{font:600 13px var(--sans);padding:11px 16px;border-radius:var(--r-s);border:1px solid var(--hair);
+  background:var(--panel);color:var(--text);cursor:pointer}
+.navbtn:hover{border-color:var(--line-s)}.navbtn:disabled{opacity:.4;cursor:not-allowed}
+.navbtn.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);margin-left:auto}
+.navbtn.go:disabled{background:var(--panel);color:var(--muted);border-color:var(--hair)}
+.lockmsg{font-size:13px;color:var(--shaky);background:color-mix(in srgb,var(--shaky) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--shaky) 35%,transparent);border-radius:var(--r-s);padding:12px 14px;max-width:760px}
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--raise);
+  color:var(--text);border:1px solid var(--line-s);padding:11px 18px;border-radius:99px;font:600 13px var(--sans);
+  box-shadow:var(--sh);opacity:0;pointer-events:none;transition:.25s;z-index:80}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+footer{border-top:1px solid var(--hair);padding:16px 20px;text-align:center;font:500 11.5px/1.6 var(--mono);color:var(--faint)}
+
+@media(max-width:900px){
+  .brand b small{display:none}
+  main{grid-template-columns:1fr;gap:0}
+  .coursenav{position:fixed;inset:53px 0 auto 0;z-index:30;max-height:74vh;background:var(--ink);
+    border-bottom:1px solid var(--hair);padding:16px 20px;display:none}
+  .coursenav.open{display:block}
+  .menu-btn{display:grid}
+  .levelwrap{max-width:none}
+}
+@media print{header,.coursenav,.ctrls,.lfoot,.menu-btn,footer{display:none!important}.why{display:block!important}}
+</style>
+</head>
+<body>
+<header>
+  <button class="icon-btn menu-btn" id="menuBtn" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <b>Kafka 0 → 100<small>Learn it properly</small></b>
+  </div>
+  <div class="levelwrap"><span class="lv" id="lvLabel">Level 0</span><div class="track"><div class="fill" id="lvFill"></div></div></div>
+  <button class="icon-btn" id="themeBtn" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.2"/><path d="M8 2.8a5.2 5.2 0 0 0 0 10.4z" fill="currentColor" stroke="none"/></svg></button>
+</header>
+<main>
+  <aside class="coursenav" id="nav"></aside>
+  <section id="content"></section>
+</main>
+<footer id="footer">A guided path · progress saved automatically</footer>
+<div class="toast" id="toast"></div>
+
+<script id="payload" type="application/json">{"lessons": [{"stage": "A", "module": "Foundations", "level": 4, "sim": "log", "title": "The one idea: Kafka is a log", "hook": "Forget 'message queue'. Kafka is a notebook you only ever append to.", "checks": [{"q": "In Kafka, what happens to a record after a consumer reads it?", "options": ["It's deleted", "It stays in the log (kept for the retention period)", "It moves to a dead-letter queue", "It's compressed"], "answer": 1, "why": "Unlike a queue, Kafka retains records for a configured time regardless of who read them — that's what enables replay and multiple independent consumers."}, {"q": "What is an 'offset'?", "options": ["The size of a message", "A record's position within a partition", "The number of consumers", "A compression setting"], "answer": 1, "why": "An offset is the sequential position of a record within a partition. Consumers track their own offset (their 'bookmark')."}], "title_id": "the-one-idea-kafka-is-a-log", "body_html": "<p>Almost every Kafka misconception comes from calling it a &quot;queue.&quot; A queue <strong>deletes</strong> a message once someone reads it. Kafka does <strong>not</strong>.</p>\n<p><strong>Kafka is a distributed, append-only commit log.</strong> Picture a notebook where you can only ever add a new line at the bottom — never edit or remove. Each line gets a line number. Readers remember <em>which line they're on</em> and read forward at their own pace.</p>\n<p>That one design choice gives Kafka its superpowers:</p>\n<ul>\n<li><strong>Replay</strong> — a new reader can start at line 1 and re-read everything.</li>\n<li><strong>Many independent readers</strong> — a billing system and an analytics system both read the same log without stepping on each other.</li>\n<li><strong>Buffering</strong> — if a reader is slow, it just <em>falls behind</em> (we call this &quot;lag&quot;); nothing is dropped.</li>\n</ul>\n<p>A record is just <code>(key, value, timestamp)</code> plus its position (the <strong>offset</strong>). Kafka never looks inside the value — to Kafka it's opaque bytes.</p>\n<blockquote>\n<p><strong>Try the simulator below.</strong> Produce a few records and watch offsets grow. Move the two consumer groups independently. Notice: reading does <strong>not</strong> delete anything.</p>\n</blockquote>\n"}, {"stage": "A", "module": "Foundations", "level": 8, "title": "Topics & partitions", "hook": "One giant log can't scale. So we split it into partitions.", "checks": [{"q": "Kafka guarantees ordering at what scope?", "options": ["The whole topic", "A single partition", "The whole cluster", "A consumer group"], "answer": 1, "why": "Ordering holds only within one partition. There is no global order across partitions of a topic."}, {"q": "Why does Kafka split a topic into partitions?", "options": ["To save disk", "For parallelism and horizontal scale", "To encrypt data", "To reduce the number of brokers"], "answer": 1, "why": "Partitions let Kafka spread a topic across brokers and be read/written in parallel — the unit of scale."}], "title_id": "topics-partitions", "body_html": "<p>A <strong>topic</strong> is a named stream of records — e.g. <code>orders</code>, <code>clicks</code>, <code>payments</code>. But a single append-only log lives on one machine and can only go so fast. So Kafka splits each topic into <strong>partitions</strong>.</p>\n<p><strong>A partition is itself an ordered log.</strong> A topic with 4 partitions is really 4 independent logs you can spread across different servers and read in parallel.</p>\n<pre><code>TOPIC &quot;orders&quot; (4 partitions)\n P0: [m0][m1][m2][m3] →\n P1: [m0][m1][m2] →\n P2: [m0][m1][m2][m3][m4] →\n P3: [m0][m1] →\n</code></pre>\n<p>Two things to burn into memory right now (they drive half of all Kafka questions):</p>\n<ol>\n<li><strong>Partitions are the unit of parallelism.</strong> More partitions = more parallel reading/writing.</li>\n<li><strong>Order is guaranteed only <em>within</em> a partition</strong> — never across the whole topic. Offsets restart at 0 in each partition.</li>\n</ol>\n<p>So if you ever need events to stay in order, they must end up in the <strong>same partition</strong> (we'll see how — with keys — in a later lesson).</p>\n"}, {"stage": "A", "module": "Foundations", "level": 12, "title": "Producers, consumers & the bookmark", "hook": "Who writes, who reads, and how readers remember their place.", "checks": [{"q": "A new consumer group with default settings sees none of the existing data. Why?", "options": ["Kafka deleted it", "auto.offset.reset defaults to 'latest', so it starts at the end", "The producer failed", "Retention expired"], "answer": 1, "why": "Default auto.offset.reset=latest starts a new group at the end of the log. Set it to 'earliest' to read history."}, {"q": "Where does Kafka store a consumer's committed offsets?", "options": ["On the consumer's local disk", "In the internal __consumer_offsets topic", "In ZooKeeper", "In the Schema Registry"], "answer": 1, "why": "Offsets are committed to the internal __consumer_offsets topic, so a restarted consumer resumes from where it left off."}], "title_id": "producers-consumers-the-bookmark", "body_html": "<ul>\n<li>A <strong>producer</strong> writes records to a topic. It decides which partition each record goes to (usually by hashing a key — more soon).</li>\n<li>A <strong>consumer</strong> reads records from a topic, in order, within each partition.</li>\n<li>The <strong>offset</strong> is the consumer's bookmark. After reading record at offset 5, it <strong>commits</strong> offset 6 (&quot;I'm done through 5, give me 6 next&quot;).</li>\n</ul>\n<p>Committed offsets are stored by Kafka itself (in an internal topic called <code>__consumer_offsets</code>). So if a consumer restarts, it picks up exactly where it left off.</p>\n<p><strong>The gotcha that confuses everyone (a real interview favorite):</strong> when a brand-new consumer starts and has <em>no</em> committed offset, the <code>auto.offset.reset</code> setting decides where to begin:</p>\n<ul>\n<li><code>latest</code> (the <strong>default</strong>) → start at the <em>end</em>; you only see <em>new</em> records and appear to &quot;miss&quot; everything already there.</li>\n<li><code>earliest</code> → start at offset 0 and read all history.</li>\n</ul>\n<p>People constantly think &quot;Kafka lost my data!&quot; when really their consumer started at <code>latest</code>. The data is still in the log.</p>\n"}, {"stage": "A", "module": "Foundations", "level": 16, "sim": "group", "title": "Consumer groups: sharing the work", "hook": "The single most-tested rule in Kafka lives here.", "checks": [{"q": "A topic has 4 partitions. You run 6 consumers in ONE group. What happens?", "options": ["Each partition is shared by 1.5 consumers", "4 consumers each get a partition; 2 sit idle", "Kafka creates 2 more partitions", "An error is thrown"], "answer": 1, "why": "Max useful consumers in a group = partition count. The extra 2 consumers have nothing to read and stay idle."}, {"q": "Two consumers are in DIFFERENT groups. Do they both receive all the records?", "options": ["No, they compete for records", "Yes — each group gets the full stream independently", "Only if replication.factor > 1", "Only the newer group does"], "answer": 1, "why": "Different groups are independent (pub/sub). Each group gets every record and tracks its own offsets."}], "title_id": "consumer-groups-sharing-the-work", "body_html": "<p>A <strong>consumer group</strong> is a set of consumers (usually copies of the same app) that <em>split</em> a topic's partitions between them to share the load.</p>\n<p><strong>The golden rule:</strong></p>\n<blockquote>\n<p>Within one group, each partition is read by <strong>exactly one</strong> consumer.</p>\n</blockquote>\n<p>Consequences (say these in any interview):</p>\n<ul>\n<li>A consumer can own several partitions, but a partition is <strong>never</strong> split across two consumers in the same group.</li>\n<li>So the <strong>maximum useful number of consumers in a group = the number of partitions.</strong> A 5th consumer on a 4-partition topic just sits <strong>idle</strong>.</li>\n<li><strong>Different groups are independent.</strong> Group &quot;billing&quot; and group &quot;analytics&quot; each receive the <em>full</em> stream — that's pub/sub fan-out, and it's free.</li>\n</ul>\n<p>When a consumer joins or leaves, Kafka <strong>rebalances</strong> — it reassigns partitions among the remaining consumers.</p>\n<blockquote>\n<p><strong>Use the simulator.</strong> Slide the partition count and add/remove consumers. Watch assignments shift on each &quot;rebalance,&quot; and watch a consumer go <strong>idle</strong> the moment you have more consumers than partitions.</p>\n</blockquote>\n"}, {"stage": "A", "module": "Foundations", "level": 20, "title": "Kafka vs a queue vs a database", "hook": "Knowing when NOT to use Kafka is a senior signal.", "checks": [{"q": "Which is the WEAKEST reason to choose Kafka over a managed queue?", "options": ["You need to replay history", "Many independent consumers read the same data", "You want a simple low-volume task queue with zero ops", "You need very high throughput"], "answer": 2, "why": "For a simple, low-volume task queue, Kafka's operational weight isn't worth it — a managed queue is simpler. Kafka shines at streaming, replay, fan-out, and scale."}], "title_id": "kafka-vs-a-queue-vs-a-database", "body_html": "<p>Use the right tool. Have these distinctions ready.</p>\n<table>\n<thead>\n<tr>\n  <th>Need</th>\n  <th>Reach for</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n  <td>High-volume event streaming, replay, many independent readers, ordering per key</td>\n  <td><strong>Kafka</strong></td>\n</tr>\n<tr>\n  <td>Task queue, complex routing, per-message priority/TTL, request-reply</td>\n  <td><strong>RabbitMQ / SQS</strong></td>\n</tr>\n<tr>\n  <td>Current state + ad-hoc queries / joins</td>\n  <td><strong>A database</strong></td>\n</tr>\n</tbody>\n</table>\n<p><strong>Kafka vs a queue:</strong> a queue deletes on read and is great for &quot;do this task once.&quot; Kafka retains data and is great for &quot;stream of events many systems react to.&quot; Historically Kafka had no competing-consumers-per-partition (true queue) mode; <strong>KIP-932 &quot;share groups&quot;</strong> now adds queue semantics (GA around Kafka 4.2).</p>\n<p><strong>Kafka vs a database:</strong> complementary. A DB holds <em>current state</em>; Kafka holds <em>the stream of changes</em>. Change Data Capture (CDC, e.g. Debezium) streams DB changes <em>into</em> Kafka.</p>\n<p><strong>Don't use Kafka for:</strong> tiny scale, synchronous low-latency RPC (use gRPC/HTTP), or when you need rich per-message routing/priority.</p>\n<p>You've reached <strong>Level 20</strong> — you understand <em>what Kafka is</em>. Next: how it actually works inside.</p>\n"}, {"stage": "B", "module": "How it works", "level": 24, "title": "The cluster: brokers & the controller (KRaft)", "hook": "What's actually running, and what replaced ZooKeeper.", "checks": [{"q": "In Kafka 4.0+, what manages cluster metadata?", "options": ["ZooKeeper", "KRaft — a Raft quorum of controller nodes", "A PostgreSQL database", "Each consumer independently"], "answer": 1, "why": "Kafka 4.0 removed ZooKeeper; KRaft stores metadata in the internal __cluster_metadata topic via a Raft controller quorum."}], "title_id": "the-cluster-brokers-the-controller-kraft", "body_html": "<p>A Kafka <strong>cluster</strong> is a set of <strong>brokers</strong> (servers). Each broker stores some partitions, serves reads/writes for the partitions it <em>leads</em>, and replicates others.</p>\n<p>Someone has to track cluster <strong>metadata</strong>: which topics/partitions exist, who leads each partition, configs, etc. Historically that job belonged to <strong>ZooKeeper</strong>, a separate system.</p>\n<p><strong>As of Kafka 4.0 (March 2025), ZooKeeper is gone.</strong> Kafka now uses <strong>KRaft</strong> (Kafka Raft): a small <strong>quorum of controller nodes</strong> (3 or 5) stores all metadata in an internal log topic (<code>__cluster_metadata</code>) using the Raft consensus algorithm. KRaft has been production-ready since 3.3.1.</p>\n<p>Why it's better:</p>\n<table>\n<thead>\n<tr>\n  <th>ZooKeeper era</th>\n  <th>KRaft era</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n  <td>Extra system to run &amp; secure</td>\n  <td>One system, fewer moving parts</td>\n</tr>\n<tr>\n  <td>Slow controller failover</td>\n  <td>Near-instant failover</td>\n</tr>\n<tr>\n  <td>~200K partition ceiling</td>\n  <td>Millions of partitions</td>\n</tr>\n</tbody>\n</table>\n<p><strong>Interview-ready line:</strong> &quot;KRaft made cluster metadata a Raft-replicated Kafka log managed by controller nodes, removing the ZooKeeper dependency — faster failover and far higher partition scale.&quot;</p>\n"}, {"stage": "B", "module": "How it works", "level": 28, "title": "Replication: leaders, followers & the ISR", "hook": "This is how Kafka doesn't lose your data — and a top interview topic.", "checks": [{"q": "When a leader broker dies, where does the new leader come from?", "options": ["Any random replica", "A replica from the ISR (guaranteed caught up)", "A brand-new broker", "The consumer with the highest offset"], "answer": 1, "why": "The controller elects the new leader from the in-sync replicas, which are caught up — so committed data isn't lost (with unclean election off)."}, {"q": "What does it mean when 'the ISR shrinks'?", "options": ["A partition was deleted", "A replica fell behind and was removed from the in-sync set", "Disk space ran out", "A consumer left the group"], "answer": 1, "why": "A follower that lags beyond replica.lag.time.max.ms is dropped from the ISR until it catches up — often a sign of a struggling broker."}], "title_id": "replication-leaders-followers-the-isr", "body_html": "<p>Each partition has <code>replication.factor</code> copies on different brokers. One copy is the <strong>leader</strong> (handles all reads/writes); the others are <strong>followers</strong> that continuously copy (&quot;fetch&quot;) from the leader.</p>\n<p>The <strong>ISR — In-Sync Replicas</strong> — is the set of replicas currently <em>caught up</em> to the leader (within <code>replica.lag.time.max.ms</code>). The leader is always in it. A follower that falls behind (slow disk, GC, network) is <strong>removed from the ISR</strong> (&quot;ISR shrink&quot;) and re-added when it catches up.</p>\n<p>Why the ISR is everything: durability is defined relative to it.</p>\n<pre><code>P0 replicas: [B1 leader, B2, B3]   ISR = {B1, B2, B3}\nB3 falls 40s behind  →  ISR shrinks to {B1, B2}\nB3 catches up        →  ISR expands back to {B1, B2, B3}\n</code></pre>\n<p>If the leader broker dies, the controller elects a <strong>new leader from the ISR</strong> — a replica guaranteed to be caught up — so <strong>no data is lost</strong>. (There's a risky setting, <code>unclean.leader.election</code>, that can elect a <em>behind</em> replica and lose data; default is off. More in the correctness stage.)</p>\n<p><strong>Remember:</strong> replication only protects you if the copies are in <strong>independent failure domains</strong> — spread brokers across racks/AZs (<code>broker.rack</code>), or one rack/AZ failure takes all copies at once.</p>\n"}, {"stage": "B", "module": "How it works", "level": 33, "sim": "acks", "title": "The producer write path & acks", "hook": "The single dial that decides 'fast' vs 'never lose data'.", "checks": [{"q": "With acks=1, a broker fails and you lose a just-acknowledged record. Why?", "options": ["acks=1 disables replication", "The leader acked before followers replicated; it died before they copied it", "min.insync.replicas was too high", "The consumer committed too early"], "answer": 1, "why": "acks=1 acks as soon as the leader persists — before followers copy. If the leader dies first, the new leader never had it. Use acks=all."}, {"q": "Best-practice durability combo for replication.factor=3?", "options": ["acks=0, min.insync.replicas=1", "acks=1, min.insync.replicas=3", "acks=all, min.insync.replicas=2", "acks=all, min.insync.replicas=3"], "answer": 2, "why": "acks=all + min.insync.replicas=2 (with RF=3) tolerates one broker down and still accepts writes with two in-sync copies. Setting min.insync=3 rejects writes when any broker is down."}], "title_id": "the-producer-write-path-acks", "body_html": "<p>When a producer sends a record:</p>\n<ol>\n<li>It <strong>serializes</strong> the key/value and the <strong>partitioner</strong> picks a partition.</li>\n<li>The record joins an in-memory <strong>batch</strong> for that partition.</li>\n<li>The batch is sent when <code>batch.size</code> fills or <code>linger.ms</code> elapses (batching = throughput).</li>\n<li>The <strong>leader</strong> appends it; <strong>followers replicate</strong>.</li>\n<li>The broker <strong>acknowledges</strong> based on <code>acks</code>.</li>\n</ol>\n<p><code>acks</code> is the durability dial:</p>\n<table>\n<thead>\n<tr>\n  <th>acks</th>\n  <th>Meaning</th>\n  <th>Risk</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n  <td><code>0</code></td>\n  <td>Fire-and-forget, don't wait</td>\n  <td>Can silently lose data</td>\n</tr>\n<tr>\n  <td><code>1</code></td>\n  <td>Leader has it</td>\n  <td>Lost if leader dies before followers copy</td>\n</tr>\n<tr>\n  <td><code>all</code></td>\n  <td>All in-sync replicas have it</td>\n  <td>Safest</td>\n</tr>\n</tbody>\n</table>\n<p>Pair <code>acks=all</code> with <strong><code>min.insync.replicas</code></strong> — the minimum ISR size required to accept a write. The <strong>safe production combo</strong>:</p>\n<blockquote>\n<p><code>replication.factor=3</code> + <code>min.insync.replicas=2</code> + <code>acks=all</code></p>\n</blockquote>\n<p>This survives one broker down with <strong>zero data loss</strong>. If two brokers go down (ISR &lt; 2), Kafka <em>rejects</em> writes rather than risk losing them — a deliberate choice of consistency over availability.</p>\n<blockquote>\n<p><strong>Run the simulator.</strong> Pick <code>acks</code>, send a record, then <strong>kill the leader</strong>. With <code>acks=1</code> you'll watch the record vanish; with <code>acks=all</code> it survives. Then kill a follower and watch writes get <strong>rejected</strong> when the ISR drops below <code>min.insync.replicas</code>.</p>\n</blockquote>\n"}, {"stage": "B", "module": "How it works", "level": 37, "title": "The consumer read loop", "hook": "poll → process → commit. Get the order wrong and you lose or duplicate data.", "checks": [{"q": "To get at-least-once delivery, when do you commit the offset?", "options": ["Before processing the batch", "After successfully processing the batch", "Never — let it auto-commit always", "Only on shutdown"], "answer": 1, "why": "Committing after processing means a crash reprocesses uncommitted records (at-least-once). Committing before risks skipping them (at-most-once)."}], "title_id": "the-consumer-read-loop", "body_html": "<p>A consumer runs a loop:</p>\n<pre><code>while (true) {\n  records = consumer.poll(timeout);   // fetch a batch\n  process(records);                   // your work\n  consumer.commitSync();              // mark progress\n}\n</code></pre>\n<p>The <strong>order</strong> of process vs commit defines your guarantee:</p>\n<ul>\n<li><strong>Commit <em>after</em> processing</strong> → if you crash mid-batch, you reprocess on restart → <strong>at-least-once</strong> (may duplicate, never lose). This is the common, safe default.</li>\n<li><strong>Commit <em>before</em> processing</strong> → a crash skips records → <strong>at-most-once</strong> (may lose). Usually a bug.</li>\n</ul>\n<p><code>enable.auto.commit=true</code> commits periodically in the background — convenient but its timing makes the guarantee fuzzy, so for correctness-sensitive work, <strong>commit manually after processing</strong>.</p>\n<p>Two timeouts keep you in the group:</p>\n<ul>\n<li><code>heartbeat.interval.ms</code> — background &quot;I'm alive&quot; pings.</li>\n<li><code>max.poll.interval.ms</code> — the max time <em>between</em> polls. If your processing of one batch takes longer than this, the broker thinks you're dead and <strong>rebalances</strong> (causing the dreaded rebalance storm — covered later). Tame it with smaller <code>max.poll.records</code> or a bigger interval.</li>\n</ul>\n"}, {"stage": "B", "module": "How it works", "level": 40, "title": "The high watermark", "hook": "Why a consumer can't read the very newest record on the leader.", "checks": [{"q": "Consumers can read records up to which offset?", "options": ["The leader's Log End Offset", "The high watermark (replicated to all ISR)", "Offset 0 only", "The follower's LEO"], "answer": 1, "why": "The high watermark is the highest offset replicated to all in-sync replicas. Records above it aren't shown, so consumers never see data that could be lost."}], "title_id": "the-high-watermark", "body_html": "<p>The leader's <strong>Log End Offset (LEO)</strong> is where the next record will go. But consumers can't read all the way up to the LEO — they can only read up to the <strong>high watermark (HW)</strong>.</p>\n<p><strong>The high watermark = the highest offset that has been replicated to <em>all</em> in-sync replicas.</strong></p>\n<p>Why hide the newest records? Because a record that's only on the leader (not yet on the followers) could <strong>vanish if the leader fails</strong> before replication. By only exposing records that are safely on every ISR member, Kafka guarantees consumers <strong>never see a record that might later disappear</strong>. It's consistency by construction.</p>\n<pre><code>Leader log:  [0][1][2][3][4][5]      LEO = 6\nFollowers have up to offset 3        HW  = 4\nConsumers can read offsets 0..3 only ─┘\n(4 and 5 become visible once followers catch up)\n</code></pre>\n<p>(With transactions, <code>read_committed</code> consumers are bounded even tighter, by the <strong>Last Stable Offset</strong> — more in the next stage.)</p>\n<p>🎉 <strong>Level 40.</strong> You now understand Kafka's core machinery: cluster, replication, the write path, the read loop, and visibility. Next: getting correctness exactly right.</p>\n"}, {"stage": "C", "module": "Getting it right", "level": 45, "title": "Delivery guarantees: the three kinds", "hook": "At-most-once, at-least-once, exactly-once — and which you get by default.", "checks": [{"q": "What is Kafka's default, most common delivery guarantee?", "options": ["At-most-once", "At-least-once", "Exactly-once", "Zero-once"], "answer": 1, "why": "poll→process→commit with retries gives at-least-once: never lose, may duplicate. Handle the duplicates with idempotent processing."}, {"q": "The cheapest way to make duplicates harmless is usually:", "options": ["Enable transactions everywhere", "Make downstream writes idempotent (e.g. upsert by key)", "Set acks=0", "Add more partitions"], "answer": 1, "why": "At-least-once + idempotent writes gives effectively-once without the latency and complexity of full transactions."}], "title_id": "delivery-guarantees-the-three-kinds", "body_html": "<p>There are exactly three delivery semantics:</p>\n<table>\n<thead>\n<tr>\n  <th>Guarantee</th>\n  <th>Meaning</th>\n  <th>How you get it</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n  <td><strong>At-most-once</strong></td>\n  <td>0 or 1 delivery (may lose, never dup)</td>\n  <td>Commit <em>before</em> processing, or <code>acks=0</code></td>\n</tr>\n<tr>\n  <td><strong>At-least-once</strong></td>\n  <td>1+ delivery (never lose, may dup)</td>\n  <td>Commit <em>after</em> processing + retries — <strong>the default</strong></td>\n</tr>\n<tr>\n  <td><strong>Exactly-once</strong></td>\n  <td>Effect applied once</td>\n  <td>Idempotent producer + transactions</td>\n</tr>\n</tbody>\n</table>\n<p><strong>At-least-once is the normal world.</strong> Duplicates happen when you process a batch, then crash before committing — the next consumer reprocesses it.</p>\n<p><strong>The pragmatic secret most people miss:</strong> you usually don't need full exactly-once machinery. If your processing is <strong>idempotent</strong> — e.g. &quot;upsert this record by its key&quot; or &quot;dedupe by message id&quot; — then reprocessing a duplicate is harmless. <strong>At-least-once + idempotent writes</strong> gives you effectively-once at a fraction of the cost. Interviewers love this answer because it shows judgment, not reflex.</p>\n"}, {"stage": "C", "module": "Getting it right", "level": 50, "title": "Idempotent producer (free dedupe)", "hook": "The on-by-default feature that stops retries from creating duplicates or chaos.", "checks": [{"q": "What does the idempotent producer guarantee?", "options": ["Exactly-once across the whole pipeline", "No duplicates or reordering from retries, per partition, within a session", "Cross-partition atomic writes", "Zero consumer lag"], "answer": 1, "why": "PID + per-partition sequence numbers let the broker drop duplicate retries and enforce order — scoped to one producer session per partition."}], "title_id": "idempotent-producer-free-dedupe", "body_html": "<p>A producer <strong>retries</strong> on transient failures. Without protection, a retried batch could be written <strong>twice</strong> (duplicate) or land <strong>out of order</strong>.</p>\n<p>The <strong>idempotent producer</strong> (<code>enable.idempotence=true</code>, the <strong>default since Kafka 3.0</strong>) fixes both:</p>\n<ul>\n<li>The producer gets a <strong>Producer ID (PID)</strong> and stamps each record with a <strong>sequence number per partition</strong>.</li>\n<li>The broker remembers the last sequence per <code>(PID, partition)</code>. A retry with an already-seen sequence is <strong>silently dropped</strong> (no dup). An out-of-order sequence is rejected (preserves order).</li>\n</ul>\n<p>So with idempotence on, retries are safe — no duplicates, no reordering — for free.</p>\n<p><strong>Scope (important nuance):</strong> idempotence dedupes only <em>within one producer session, per partition</em>. It does <strong>not</strong> dedupe across producer restarts, and it gives <strong>no</strong> cross-partition atomicity. For &quot;all-or-nothing across partitions&quot; you need transactions — next lesson.</p>\n"}, {"stage": "C", "module": "Getting it right", "level": 55, "title": "Transactions & exactly-once", "hook": "Atomic 'read → process → write' so partial results never escape.", "checks": [{"q": "For exactly-once in a Kafka-to-Kafka read-process-write loop, consumers should set:", "options": ["isolation.level=read_committed", "acks=0", "auto.offset.reset=latest", "enable.auto.commit=true"], "answer": 0, "why": "read_committed makes consumers see only committed transactional records (up to the Last Stable Offset), so partial transactions never leak."}, {"q": "What's a key limitation of Kafka transactions / EOS?", "options": ["They only work with one partition", "They span Kafka-to-Kafka only, not arbitrary external systems", "They require ZooKeeper", "They disable replication"], "answer": 1, "why": "EOS guarantees hold within Kafka. External sinks need their own idempotency; you can't transactionally tie an arbitrary DB write to a Kafka commit easily."}], "title_id": "transactions-exactly-once", "body_html": "<p>Sometimes you need <strong>all-or-nothing across partitions</strong>: a stream app reads from topic A, writes to topic B, and commits its input offset — and you want <em>all three</em> to commit together or not at all (so a crash never leaves topic B half-written with the offset already advanced).</p>\n<p>That's <strong>transactions</strong>:</p>\n<ul>\n<li>The producer sets a stable <code>transactional.id</code>. A <strong>Transaction Coordinator</strong> (a broker) tracks state in <code>__transaction_state</code>.</li>\n<li>You bracket work: <code>beginTransaction()</code> → produce + <code>sendOffsetsToTransaction()</code> → <code>commitTransaction()</code> (or <code>abortTransaction()</code>).</li>\n<li>Downstream consumers set <code>isolation.level=read_committed</code> so they <strong>only see committed records</strong> (they read up to the <strong>Last Stable Offset</strong>). Aborted/in-flight data is invisible.</li>\n</ul>\n<p>In <strong>Kafka Streams</strong>, all of this is one config: <code>processing.guarantee=exactly_once_v2</code>.</p>\n<p><strong>The catch:</strong> EOS only spans <strong>Kafka-to-Kafka</strong>. If your &quot;write&quot; hits an external system (a DB, an API), that system must be idempotent or join the transaction (usually impractical) — so for external sinks, prefer <strong>at-least-once + idempotent writes</strong>.</p>\n"}, {"stage": "C", "module": "Getting it right", "level": 60, "title": "Ordering & keys — the rule that runs everything", "hook": "Want events in order? Then they must share a partition. Then they must share a key.", "checks": [{"q": "You need all events for each order processed in order. What do you do?", "options": ["Use a single partition for the whole topic", "Key the records by orderId so each order maps to one partition", "Disable replication", "Set acks=0"], "answer": 1, "why": "Keying by orderId sends each order's events to the same partition (ordered), while different orders spread across partitions for parallelism."}, {"q": "What breaks when you INCREASE partitions on a keyed topic?", "options": ["Nothing", "The key→partition mapping changes, breaking existing per-key ordering", "Replication factor resets", "Offsets reset to zero"], "answer": 1, "why": "hash(key) % partitions changes with partition count, so keys remap and per-key ordering breaks during the change; old data isn't redistributed."}], "title_id": "ordering-keys-the-rule-that-runs-everything", "body_html": "<p>Recall: <strong>order is guaranteed only within a partition.</strong> So anything that must stay ordered has to land in the <strong>same partition</strong> — which means it must share a <strong>key</strong>.</p>\n<p>How partitioning works:</p>\n<ul>\n<li><strong>Key present</strong> → <code>hash(key) % numPartitions</code>. Same key → same partition → ordered. (Use <code>orderId</code>, <code>userId</code>, <code>accountId</code> as the key when per-entity order matters.)</li>\n<li><strong>Key null</strong> → records are spread (sticky/round-robin) for even load — no per-entity ordering.</li>\n</ul>\n<p>Two traps interviewers probe:</p>\n<ol>\n<li><p><strong>Key skew / hot partition.</strong> If one key is wildly popular (a celebrity user), its partition becomes a hotspot — one consumer drowns while others idle. Fix with a composite key, salting (loses strict order for that key), or a custom partitioner.</p>\n</li>\n<li><p><strong>Changing partition count breaks ordering.</strong> Increase partitions and <code>% N</code> changes, so a key that mapped to P2 may now map to P5 — <strong>existing per-key order breaks</strong> during the transition, and old data isn't moved. <strong>Lesson: over-provision partitions up front.</strong></p>\n</li>\n</ol>\n<p>And keep <strong>idempotence on</strong> — without it, producer retries can reorder records <em>within</em> a partition.</p>\n<p>🎉 <strong>Level 60.</strong> You can now reason about correctness — guarantees, dedupe, atomicity, and ordering. Next: making it fast and running it in production.</p>\n"}, {"stage": "D", "module": "Running it", "level": 64, "title": "Throughput vs latency tuning", "hook": "Almost every Kafka config is a point on the throughput / latency / durability triangle.", "checks": [{"q": "Which is NOT a reason Kafka is fast?", "options": ["Sequential disk I/O", "Zero-copy via sendfile", "Random-access B-tree index per message", "Batching + compression"], "answer": 2, "why": "Kafka is an append-only log using sequential I/O, page cache, zero-copy, and batching — not a per-message random-access index."}, {"q": "What does increasing linger.ms do?", "options": ["Adds a small wait so more records batch together (more throughput, slightly more latency)", "Disables replication", "Reduces partition count", "Forces acks=all"], "answer": 0, "why": "linger.ms lets the producer wait briefly to fill larger batches — higher throughput at the cost of a little latency."}], "title_id": "throughput-vs-latency-tuning", "body_html": "<p><strong>Why Kafka is fast</strong> (name these): sequential disk writes, OS <strong>page cache</strong> (no JVM cache, low GC), <strong>zero-copy</strong> (<code>sendfile</code> straight from cache to socket), <strong>batching</strong>, and <strong>compression</strong>.</p>\n<p>The dials you tune:</p>\n<p><strong>Producer</strong></p>\n<ul>\n<li>Throughput ↑: bigger <code>batch.size</code>, a little <code>linger.ms</code> (e.g. 5–50ms to let batches fill), <code>compression.type=lz4</code>/<code>zstd</code>.</li>\n<li>Latency ↓: <code>linger.ms=0</code>, smaller batches.</li>\n<li>Durability: <code>acks=all</code>, idempotence on.</li>\n</ul>\n<p><code>linger.ms</code> is the key tradeoff: waiting a few ms batches more records together → big throughput win for a small latency cost.</p>\n<p><strong>Consumer</strong></p>\n<ul>\n<li><code>fetch.min.bytes</code> / <code>fetch.max.wait.ms</code> batch fetches (throughput vs latency).</li>\n<li><code>max.poll.records</code> — too high and you blow past <code>max.poll.interval.ms</code> → rebalance.</li>\n<li>Real parallelism = partitions. To go faster, add partitions <em>and</em> consumers.</li>\n</ul>\n<p><strong>Cluster</strong>: spread partitions evenly (no hot brokers), fast disks, enough RAM for page cache, fast network.</p>\n"}, {"stage": "D", "module": "Running it", "level": 68, "title": "How many partitions? (and the resize trap)", "hook": "Pick too few and you can't scale; pick too many and ops suffer. And you can't easily go back.", "checks": [{"q": "Why over-provision partitions at topic creation?", "options": ["Partitions are free", "You can't decrease them, and increasing breaks per-key ordering", "More partitions always means lower latency", "To reduce replication factor"], "answer": 1, "why": "You can't shrink partition count, and growing it remaps keys (breaking ordering) without moving old data — so plan headroom up front."}], "title_id": "how-many-partitions-and-the-resize-trap", "body_html": "<p>Partitions set your parallelism ceiling and your max consumers per group. A rough sizing:</p>\n<pre><code>partitions ≈ target_throughput / per_partition_throughput\n</code></pre>\n<p>Then round up and add <strong>headroom</strong> — because:</p>\n<ul>\n<li>You <strong>cannot decrease</strong> partitions.</li>\n<li><strong>Increasing</strong> partitions on a keyed topic <strong>breaks per-key ordering</strong> (the hash remaps) and doesn't move old data.</li>\n</ul>\n<p>So <strong>over-provision sensibly up front</strong>. But don't go wild: every partition costs open files, memory, and replication work, and <em>more partitions = longer failover</em> (more leaders to re-elect). Historically people kept partitions-per-broker in the low thousands; KRaft raised that ceiling dramatically (millions cluster-wide), but the operational costs still apply.</p>\n<p>Also remember: max useful consumers in a group = partition count, so size partitions for the <em>peak</em> parallelism you'll ever want.</p>\n"}, {"stage": "D", "module": "Running it", "level": 72, "title": "Rebalancing & rebalance storms", "hook": "The #1 operational pain in consumer groups — and how the protocol got better.", "checks": [{"q": "What most commonly causes a rebalance storm?", "options": ["Too many topics", "Processing a batch takes longer than max.poll.interval.ms, so consumers keep getting kicked", "Compression is enabled", "replication.factor is too low"], "answer": 1, "why": "If processing exceeds max.poll.interval.ms, the broker thinks the consumer died, triggering endless rebalances. Lower max.poll.records or raise the interval."}, {"q": "Which rebalance approach avoids stopping the whole group?", "options": ["Eager", "Cooperative/incremental (or KIP-848)", "No rebalancing at all", "Manual restart"], "answer": 1, "why": "Cooperative/incremental (and the newer server-side KIP-848 protocol) only move the partitions that must change, so most consumers keep processing."}], "title_id": "rebalancing-rebalance-storms", "body_html": "<p>A <strong>rebalance</strong> reassigns partitions when a consumer joins, leaves, or is declared dead (missed heartbeats / exceeded <code>max.poll.interval.ms</code>). Three protocols, oldest to newest:</p>\n<ul>\n<li><strong>Eager</strong> (classic): <em>stop-the-world</em> — <strong>all</strong> consumers drop <strong>all</strong> partitions, then reassign. The whole group pauses.</li>\n<li><strong>Cooperative / incremental</strong> (<code>CooperativeStickyAssignor</code>): only the partitions that must move are revoked; the rest keep processing. Much gentler. Prefer this.</li>\n<li><strong>KIP-848</strong> (GA in Kafka 4.0): assignment moves <strong>server-side</strong> (the broker computes it), removing the client-side sync barrier. Faster, and one slow consumer no longer stalls everyone. Use it on 4.x.</li>\n</ul>\n<p><strong>Rebalance storm:</strong> the group rebalances over and over and throughput collapses. Usual cause: processing a batch takes <strong>longer than <code>max.poll.interval.ms</code></strong>, so the consumer is presumed dead → rebalance → rejoin → repeat.</p>\n<p>Fixes: lower <code>max.poll.records</code> or raise <code>max.poll.interval.ms</code>; tune <code>session.timeout.ms</code>/<code>heartbeat.interval.ms</code>; use <strong>static membership</strong> (<code>group.instance.id</code>) so quick restarts don't trigger reassignment; use cooperative/KIP-848.</p>\n"}, {"stage": "D", "module": "Running it", "level": 76, "title": "Retention, compaction & tiered storage", "hook": "How Kafka decides what to keep — by age, or by key.", "checks": [{"q": "When should you use log compaction instead of time-based retention?", "options": ["For high-volume click logs", "When the topic represents current state keyed by id (keep latest per key)", "To save network bandwidth", "When you have only one partition"], "answer": 1, "why": "Compaction keeps the latest value per key — ideal for changelog/state topics where you only care about current state, not full history."}, {"q": "What problem does tiered storage solve?", "options": ["Consumer lag", "Cheap long-term retention by offloading cold segments to remote storage like S3", "Schema evolution", "Rebalance storms"], "answer": 1, "why": "Tiered storage (GA since 3.9) moves old segments to S3/HDFS, enabling near-infinite retention and faster broker recovery."}], "title_id": "retention-compaction-tiered-storage", "body_html": "<p>Two cleanup policies:</p>\n<p><strong><code>delete</code> (default)</strong> — keep records until <code>retention.ms</code> (time, default 7 days) or <code>retention.bytes</code> (size), then delete whole <strong>segments</strong> — <em>regardless of whether anyone consumed them.</em> (Consumption never deletes data.)</p>\n<p><strong><code>compact</code></strong> — keep only the <strong>latest value per key</strong>, garbage-collecting older versions. The log becomes a &quot;current state per key&quot; table.</p>\n<pre><code>Stream:   a=1  b=2  a=3  c=4  b=5  a=6\nCompacted:                c=4  b=5  a=6   (latest per key)\n</code></pre>\n<p>A <code>null</code> value is a <strong>tombstone</strong> — it deletes that key after <code>delete.retention.ms</code>. Use compaction for changelog/state topics (it's how <code>__consumer_offsets</code> and Streams state stores work). You can combine <code>compact,delete</code>.</p>\n<p><strong>Tiered storage (KIP-405, GA since Kafka 3.9):</strong> offload old &quot;cold&quot; segments to cheap remote storage (S3) while keeping &quot;hot&quot; recent data local. Result: near-infinite retention, cheaper storage, and <strong>faster broker recovery</strong> (less local data to move on failover). A go-to answer for &quot;disk is filling up&quot; and &quot;we need long replay.&quot;</p>\n"}, {"stage": "D", "module": "Running it", "level": 80, "title": "Metrics & failure modes", "hook": "What you watch, what breaks, and how you'd recover.", "checks": [{"q": "What's the single most important consumer-health metric?", "options": ["CPU usage", "Consumer lag", "Number of topics", "Disk temperature"], "answer": 1, "why": "Consumer lag (how far behind a group is) is the headline signal that consumers can't keep up."}, {"q": "How do you stop a 'poison pill' message from blocking a partition forever?", "options": ["Restart the broker", "Catch the error, route the record to a Dead Letter Queue topic, and commit past it", "Delete the topic", "Increase replication factor"], "answer": 1, "why": "Under at-least-once a failing message retries forever and blocks the partition. Route it to a DLQ with metadata and move on."}], "title_id": "metrics-failure-modes", "body_html": "<p><strong>The metrics that matter</strong> (lead with these if asked &quot;what do you monitor?&quot;):</p>\n<ul>\n<li><strong>Consumer lag</strong> (<code>log-end-offset − committed-offset</code>) — the #1 health signal. Growing unbounded = trouble.</li>\n<li><strong>Under-replicated partitions</strong> &gt; 0 sustained — replicas behind / brokers struggling.</li>\n<li><strong>Offline partitions</strong> &gt; 0 — no leader → unavailable → page someone.</li>\n<li><strong>ISR shrink/expand rate</strong> — flapping replicas.</li>\n<li><strong>Active controller count</strong> = exactly 1.</li>\n<li>Produce/fetch <strong>P99 latency</strong>, disk usage, network/disk throughput.</li>\n</ul>\n<p><strong>Failure modes &amp; fixes:</strong></p>\n<table>\n<thead>\n<tr>\n  <th>Symptom</th>\n  <th>Likely cause</th>\n  <th>Fix</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n  <td>Data loss on broker crash</td>\n  <td><code>acks=1</code> or unclean election</td>\n  <td><code>acks=all</code> + <code>min.insync.replicas=2</code>; unclean election off</td>\n</tr>\n<tr>\n  <td>Lag growing</td>\n  <td>slow processing / too few partitions / skew / poison msg</td>\n  <td>scale partitions+consumers, optimize, fix keys</td>\n</tr>\n<tr>\n  <td>Partition stuck</td>\n  <td><strong>poison pill</strong> (always-fails message)</td>\n  <td>try/catch → route to a <strong>Dead Letter Queue</strong> topic, commit past it</td>\n</tr>\n<tr>\n  <td>Constant rebalancing</td>\n  <td>exceeded <code>max.poll.interval.ms</code></td>\n  <td>lower <code>max.poll.records</code>, static membership</td>\n</tr>\n<tr>\n  <td>Whole cluster down on 1 AZ loss</td>\n  <td>all replicas in one AZ</td>\n  <td>rack-aware replica placement across AZs</td>\n</tr>\n</tbody>\n</table>\n<p>🎉 <strong>Level 80.</strong> You can tune and operate Kafka. Final stage: the ecosystem and putting it all together.</p>\n"}, {"stage": "E", "module": "The full picture", "level": 84, "title": "Kafka Connect", "hook": "Move data in and out of Kafka without writing producer/consumer code.", "checks": [{"q": "What is Kafka Connect used for?", "options": ["Compressing the log", "Streaming data between Kafka and external systems via source/sink connectors", "Managing consumer offsets manually", "Replacing brokers"], "answer": 1, "why": "Connect is a framework for integration — e.g. Debezium CDC source, S3/Elasticsearch sinks — with built-in offset management, scaling, and DLQ."}], "title_id": "kafka-connect", "body_html": "<p><strong>Kafka Connect</strong> is a framework for streaming data between Kafka and external systems declaratively (config, not code).</p>\n<ul>\n<li><strong>Source connectors</strong> pull data <em>into</em> Kafka — e.g. <strong>Debezium</strong> tails a database's write-ahead log and emits row-change events (this is <strong>CDC</strong> — Change Data Capture).</li>\n<li><strong>Sink connectors</strong> push data <em>out</em> of Kafka — to S3, Elasticsearch, a JDBC database, etc.</li>\n<li>Runs in <strong>distributed mode</strong>: a cluster of worker processes; tasks are balanced and fault-tolerant; you configure it via a REST API.</li>\n<li><strong>Converters</strong> handle serialization (e.g. Avro + Schema Registry). <strong>Single Message Transforms (SMTs)</strong> do lightweight per-record tweaks (rename, mask, route). Built-in <strong>DLQ</strong> support for bad records.</li>\n</ul>\n<p><strong>The canonical pattern:</strong> <code>Postgres → Debezium (source) → Kafka → sink connector → Elasticsearch</code>. Keyed by primary key, often on compacted topics, with idempotent upserts downstream. Connect manages offsets, scaling, and retries for you.</p>\n"}, {"stage": "E", "module": "The full picture", "level": 88, "title": "Kafka Streams & ksqlDB", "hook": "Process streams in your app — no separate cluster — with exactly-once.", "checks": [{"q": "What's the difference between a KStream and a KTable?", "options": ["KStream is faster", "KStream = stream of events (append); KTable = latest value per key (update)", "KTable can't be persisted", "They're identical"], "answer": 1, "why": "A KStream treats each record as an independent event; a KTable is a changelog keeping the latest value per key. They embody stream–table duality."}, {"q": "How is Kafka Streams' local state made fault-tolerant?", "options": ["It isn't — state is lost on restart", "It's backed by a changelog topic and rebuilt by replaying it", "It's stored in ZooKeeper", "By increasing replication factor on the input topic"], "answer": 1, "why": "Every state update is written to a compacted changelog topic; on restart/reassignment the state store is restored by replaying it."}], "title_id": "kafka-streams-ksqldb", "body_html": "<p><strong>Kafka Streams</strong> is a Java <strong>library</strong> (not a separate cluster) for building stream-processing apps: read from topics, transform/aggregate/join, write back.</p>\n<p>Core abstractions:</p>\n<ul>\n<li><strong>KStream</strong> — an unbounded stream of <strong>events</strong> (append semantics; each record is a fact like &quot;payment made&quot;).</li>\n<li><strong>KTable</strong> — a <strong>changelog/table</strong>: the latest value per key (update semantics; &quot;current balance&quot;).</li>\n<li><strong>Stateful ops</strong> (aggregations, joins, windowing) use local <strong>state stores</strong> (RocksDB) backed by a <strong>changelog topic</strong> — so state is fault-tolerant: on restart, it's <strong>rebuilt by replaying the changelog</strong>.</li>\n<li><strong>Exactly-once</strong> via one config: <code>processing.guarantee=exactly_once_v2</code>.</li>\n</ul>\n<p><strong>Stream–table duality</strong> (a favorite concept): aggregate a stream → you get a table; observe a table's changes → you get a stream.</p>\n<p><strong>ksqlDB</strong> puts SQL on top of Streams — define streams/tables/transforms in SQL instead of Java.</p>\n"}, {"stage": "E", "module": "The full picture", "level": 92, "title": "Schema Registry & evolution", "hook": "A contract between producers and consumers so a schema change can't break downstream.", "checks": [{"q": "With the default BACKWARD compatibility, which deploys first?", "options": ["Producers", "Consumers (new schema reads old data)", "Both at once", "Neither — no order needed"], "answer": 1, "why": "BACKWARD means a new schema reads old data, so you upgrade consumers first; producers can keep emitting the old shape until ready."}], "title_id": "schema-registry-evolution", "body_html": "<p>Kafka stores opaque bytes, so producers and consumers must agree on a format. <strong>Schema Registry</strong> stores versioned <strong>Avro / Protobuf / JSON</strong> schemas; each record carries a small <strong>schema ID</strong> instead of the full schema, and consumers fetch the schema to deserialize.</p>\n<p>The real value is <strong>safe schema evolution</strong>, governed by a <strong>compatibility mode</strong>:</p>\n<ul>\n<li><strong>BACKWARD</strong> (default) — a new schema can read <strong>old</strong> data (e.g. add an optional field with a default). → upgrade <strong>consumers first</strong>.</li>\n<li><strong>FORWARD</strong> — old schema can read new data. → upgrade <strong>producers first</strong>.</li>\n<li><strong>FULL</strong> — both.</li>\n<li><strong>NONE</strong> — no checks (dangerous).</li>\n</ul>\n<p>So you can evolve your data shape <strong>without coordinated, simultaneous deploys</strong> and without runtime deserialization failures. The registry simply rejects an incompatible schema before it can break anyone.</p>\n"}, {"stage": "E", "module": "The full picture", "level": 96, "title": "Putting it together: design an event-driven system", "hook": "Wire the pieces into a real order-processing system — and state your tradeoffs.", "checks": [{"q": "In an event-driven design, how do inventory, payments, and shipping each get the full order stream?", "options": ["They share one consumer group", "Each is its own consumer group (independent, full stream)", "Through a single consumer that forwards events", "Via the Schema Registry"], "answer": 1, "why": "Separate consumer groups each receive the entire stream independently (pub/sub fan-out) and track their own offsets — perfect for a choreographed saga."}], "title_id": "putting-it-together-design-an-event-driven-system", "body_html": "<p>A design walkthrough you can adapt to any &quot;design X with Kafka&quot; question:</p>\n<p><strong>Order-processing system</strong></p>\n<ul>\n<li><strong>Ingest:</strong> <code>orders</code> topic, keyed by <code>orderId</code> (per-order ordering). Durability: <code>RF=3</code>, <code>min.insync.replicas=2</code>, <code>acks=all</code> — orders are critical.</li>\n<li><strong>Process:</strong> independent consumer groups — <code>inventory</code>, <code>payments</code>, <code>shipping</code> — each react to order events and emit their own events (<code>payments</code>, <code>shipments</code>). This is a <strong>choreographed saga</strong>.</li>\n<li><strong>State / queries:</strong> materialize current order status via a compacted topic or a Streams <strong>KTable</strong>; a query service serves status from it.</li>\n<li><strong>Correctness:</strong> exactly-once (<code>exactly_once_v2</code>) where double-charging is unacceptable; elsewhere at-least-once + idempotent handlers.</li>\n<li><strong>Resilience:</strong> <strong>DLQ</strong> topics for poison messages; monitor <strong>lag</strong> per group.</li>\n<li><strong>Schema:</strong> Avro + Registry, backward-compatible.</li>\n<li><strong>Scale &amp; HA:</strong> enough partitions for throughput; brokers across <strong>AZs</strong> with rack awareness; cross-region replication (MirrorMaker 2 / Cluster Linking) for DR.</li>\n</ul>\n<p><strong>Always close by naming the tradeoffs you chose:</strong> durability over latency on the critical path; EOS only where it's truly needed. That's the senior signal.</p>\n"}, {"stage": "E", "module": "The full picture", "level": 100, "sim": "lab", "title": "Capstone: run Kafka yourself", "hook": "Reading isn't doing. Spin up a real cluster locally and watch the concepts come alive.", "checks": [{"q": "You run two console-consumers in the SAME --group on a 3-partition topic, then add a third. What happens?", "options": ["The third sits idle", "All three each take one partition and process in parallel", "An error is thrown", "Replication factor increases"], "answer": 1, "why": "With 3 partitions and 3 consumers in one group, each consumer owns one partition. A FOURTH would sit idle (max useful consumers = partitions)."}], "title_id": "capstone-run-kafka-yourself", "body_html": "<p>You've covered the theory 0→100. Now <strong>do it</strong>. The fastest way to a local Kafka (KRaft mode, no ZooKeeper) is Docker.</p>\n<p><strong>1. Start a single-broker cluster</strong></p>\n<pre><code class=\"language-bash\">docker run -d --name kafka -p 9092:9092 apache/kafka:latest\n</code></pre>\n<p><strong>2. Open a shell inside the container</strong></p>\n<pre><code class=\"language-bash\">docker exec -it kafka /bin/bash\ncd /opt/kafka/bin\n</code></pre>\n<p><strong>3. Create a topic with 3 partitions</strong></p>\n<pre><code class=\"language-bash\">./kafka-topics.sh --create --topic orders   --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1\n./kafka-topics.sh --describe --topic orders --bootstrap-server localhost:9092\n</code></pre>\n<p><strong>4. Produce (type messages, Ctrl-D to end)</strong></p>\n<pre><code class=\"language-bash\">./kafka-console-producer.sh --topic orders --bootstrap-server localhost:9092   --property parse.key=true --property key.separator=:\n# then type:   user1:placed order\n#              user2:placed order\n#              user1:cancelled\n</code></pre>\n<p><strong>5. Consume from the beginning</strong></p>\n<pre><code class=\"language-bash\">./kafka-console-consumer.sh --topic orders --from-beginning   --bootstrap-server localhost:9092 --property print.key=true\n</code></pre>\n<p><strong>6. Watch consumer groups &amp; lag</strong> (in another shell)</p>\n<pre><code class=\"language-bash\">./kafka-console-consumer.sh --topic orders --group billing --bootstrap-server localhost:9092\n# in the first shell:\n./kafka-consumer-groups.sh --describe --group billing --bootstrap-server localhost:9092\n</code></pre>\n<p><strong>Experiments that make the lessons click:</strong></p>\n<ol>\n<li><strong>Ordering by key</strong> — produce <code>user1:A</code>, <code>user2:B</code>, <code>user1:C</code>. Note all <code>user1</code> records land on the same partition, in order (<code>--property print.partition=true</code>).</li>\n<li><strong>Replay</strong> — start a <em>new</em> group with <code>--from-beginning</code>; it re-reads everything. Start one <em>without</em> it; it sees only new messages (that's <code>auto.offset.reset</code>).</li>\n<li><strong>Consumer-group scaling</strong> — run two consumers in <code>--group billing</code>; watch partitions split between them. Add a third on a 3-partition topic — all busy. Add a fourth — it sits idle.</li>\n<li><strong>Lag</strong> — pause a consumer, produce a burst, then resume; watch LAG rise and drain in <code>--describe</code>.</li>\n</ol>\n<p>🏁 <strong>Level 100.</strong> You understand Kafka end to end <em>and</em> you've run it. Pair this with the <strong>Interview Study Console</strong> to drill the 48 scenario questions, and you can walk into any round.</p>\n"}]}</script>
+<script>
+var DATA=JSON.parse(document.getElementById('payload').textContent);
+var LS=DATA.lessons, N=LS.length;
+var KEY='kafka_course_v1', mem={};
+var storage=(function(){try{var t='__t';localStorage.setItem(t,t);localStorage.removeItem(t);return localStorage;}
+  catch(e){return{getItem:function(k){return k in mem?mem[k]:null;},setItem:function(k,v){mem[k]=v;},removeItem:function(k){delete mem[k];}};}})();
+function load(){try{return JSON.parse(storage.getItem(KEY))||{};}catch(e){return{};}}
+var state=Object.assign({done:{},checks:{},theme:'dark',cur:-1},load());
+function save(){storage.setItem(KEY,JSON.stringify(state));}
+var $=function(s,r){return(r||document).querySelector(s);};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+function esc(s){return(s||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('show');},2200);}
+function applyTheme(){document.documentElement.setAttribute('data-theme',state.theme);}
+$('#themeBtn').onclick=function(){state.theme=state.theme==='dark'?'light':'dark';applyTheme();save();};
+applyTheme();
+$('#menuBtn').onclick=function(){$('#nav').classList.toggle('open');};
+
+function isDone(i){return !!state.done[i];}
+function unlocked(i){return i===0||isDone(i-1);}
+function curLevel(){var lv=0;for(var i=0;i<N;i++){if(isDone(i))lv=LS[i].level;else break;}return lv;}
+function nextIncomplete(){for(var i=0;i<N;i++)if(!isDone(i))return i;return N-1;}
+function updateLevel(){var lv=curLevel();$('#lvLabel').textContent='Level '+lv;$('#lvFill').style.width=lv+'%';
+  var dn=Object.keys(state.done).length;$('#footer').textContent=dn+' / '+N+' lessons complete · Level '+lv+' · progress saved automatically';}
+
+var STAGES=[{k:'A',name:'Foundations',rng:'0–20'},{k:'B',name:'How it works',rng:'20–40'},
+  {k:'C',name:'Getting it right',rng:'40–60'},{k:'D',name:'Running it',rng:'60–80'},{k:'E',name:'The full picture',rng:'80–100'}];
+
+function renderNav(){
+  var nav=$('#nav');nav.innerHTML='';
+  var hb=document.createElement('button');hb.className='homebtn';
+  hb.innerHTML='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7l6-5 6 5M4 6v8h8V6"/></svg> Roadmap &amp; progress';
+  hb.onclick=function(){state.cur=-1;save();renderRoadmap();renderNav();$('#nav').classList.remove('open');};
+  nav.appendChild(hb);
+  STAGES.forEach(function(st){
+    var grp=document.createElement('div');grp.className='stagegrp';
+    grp.innerHTML='<div class="stagehd"><span>'+st.name+'</span><span class="rng">'+st.rng+'</span></div>';
+    LS.forEach(function(ls,i){
+      if(ls.stage!==st.k)return;
+      var row=document.createElement('div');
+      var locked=!unlocked(i);
+      row.className='lrow'+(isDone(i)?' done':'')+(state.cur===i?' cur':'')+(locked?' locked':'');
+      row.innerHTML='<span class="tick">'+(isDone(i)?'✓':(locked?'·':''))+'</span><span>'+esc(ls.title)+'</span>';
+      row.onclick=function(){if(locked){toast('Finish the previous lesson first');return;}openLesson(i);$('#nav').classList.remove('open');};
+      grp.appendChild(row);
+    });
+    nav.appendChild(grp);
+  });
+}
+
+function renderRoadmap(){
+  var dn=Object.keys(state.done).length, ni=nextIncomplete();
+  var c=$('#content');
+  var stagesHtml=STAGES.map(function(st){
+    var inStage=LS.map(function(l,i){return{l:l,i:i};}).filter(function(o){return o.l.stage===st.k;});
+    var doneN=inStage.filter(function(o){return isDone(o.i);}).length;
+    var pct=Math.round(doneN/inStage.length*100);
+    return '<div class="stagecard"><div class="top"><span class="num">'+st.k+'</span><h3>'+st.name+'</h3>'+
+      '<span class="meta">'+doneN+'/'+inStage.length+' · '+st.rng+'</span></div>'+
+      '<div class="sub">'+inStage.map(function(o){return esc(o.l.title);}).join(' · ')+'</div>'+
+      '<div class="stagebar"><i style="width:'+pct+'%"></i></div></div>';
+  }).join('');
+  c.innerHTML='<div class="road-hero"><h1>Learn Kafka properly — 0 to 100</h1>'+
+    '<p>A guided path that builds the mental model first, then the internals, correctness, operations, and the full ecosystem. '+
+    'Every lesson ends with a quick check you must pass to advance — and three live simulators let you <em>see</em> the hard ideas work. '+
+    'No prior Kafka needed.</p>'+
+    '<button class="continue" id="contBtn">'+(dn===0?'Start Lesson 1 →':(dn>=N?'Review from the start →':'Continue · Lesson '+(ni+1)+' →'))+'</button></div>'+
+    '<div class="stages">'+stagesHtml+'</div>';
+  $('#contBtn').onclick=function(){openLesson(dn>=N?0:ni);};
+  window.scrollTo(0,0);
+}
+
+function openLesson(i){state.cur=i;save();renderLesson(i);renderNav();}
+
+function renderLesson(i){
+  var ls=LS[i], c=$('#content');
+  if(!unlocked(i)){
+    c.innerHTML='<div class="lockmsg">This lesson is locked. Complete the previous lesson to unlock it.</div>';
+    return;
+  }
+  var done=isDone(i);
+  var html='<div class="lesson"><div class="lhead">'+
+    '<span class="pill stage">Stage '+ls.stage+' · '+stageName(ls.stage)+'</span>'+
+    '<span class="pill lv">Reaches Level '+ls.level+'</span>'+
+    (done?'<span class="pill done">✓ Complete</span>':'')+'</div>'+
+    '<h2 class="lt">'+esc(ls.title)+'</h2>'+
+    '<div class="hook">'+esc(ls.hook)+'</div>'+
+    '<div class="body">'+ls.body_html+'</div>';
+  // sim mount point
+  if(ls.sim && ls.sim!=='lab') html+='<div class="sim" id="simbox"></div>';
+  // checks
+  html+='<div class="checks"><div class="chd"><span>Knowledge check</span><span style="color:var(--faint)">answer all correctly to complete</span></div><div id="checkList"></div></div>';
+  // footer nav
+  html+='<div class="lfoot">'+
+    '<button class="navbtn" id="prevBtn"'+(i===0?' disabled':'')+'>← Previous</button>'+
+    '<button class="navbtn go" id="nextBtn"'+(done?'':' disabled')+'>'+(i===N-1?(done?'Finish 🏁':'Pass the check to finish'):(done?'Next lesson →':'Pass the check to continue'))+'</button>'+
+    '</div></div>';
+  c.innerHTML=html;
+  if(ls.sim && ls.sim!=='lab') mountSim(ls.sim, $('#simbox'));
+  renderChecks(i);
+  $('#prevBtn').onclick=function(){if(i>0)openLesson(i-1);};
+  $('#nextBtn').onclick=function(){if(!isDone(i))return; if(i===N-1){toast('🏁 Course complete — Level 100!');state.cur=-1;save();renderRoadmap();renderNav();}else openLesson(i+1);};
+  window.scrollTo(0,0);
+}
+function stageName(k){for(var j=0;j<STAGES.length;j++)if(STAGES[j].k===k)return STAGES[j].name;return'';}
+
+function renderChecks(i){
+  var ls=LS[i], list=$('#checkList');list.innerHTML='';
+  if(!state.checks[i])state.checks[i]=[];
+  ls.checks.forEach(function(ch,ci){
+    var picked=state.checks[i][ci]; // stored index or undefined
+    var passed=picked===ch.answer;
+    var card=document.createElement('div');card.className='check'+(passed?' passed':'');
+    var opts=ch.options.map(function(o,oi){
+      var cls='opt',dis='';
+      if(picked!=null){ if(oi===ch.answer)cls+=' correct'; else if(oi===picked)cls+=' wrong'; if(passed)dis='disabled';}
+      return '<button class="'+cls+'" data-o="'+oi+'" '+dis+'><span class="m">'+String.fromCharCode(65+oi)+'</span>'+esc(o)+'</button>';
+    }).join('');
+    card.innerHTML='<div class="q">'+esc(ch.q)+'</div>'+opts+
+      '<div class="why'+(picked!=null?' show':'')+'"><b>'+(passed?'Correct.':'Not quite — try again.')+'</b> '+esc(ch.why)+'</div>';
+    $$('.opt',card).forEach(function(b){
+      b.onclick=function(){
+        state.checks[i][ci]=+b.dataset.o; save();
+        checkLessonComplete(i); renderChecks(i);
+      };
+    });
+    list.appendChild(card);
+  });
+}
+function checkLessonComplete(i){
+  var ls=LS[i], arr=state.checks[i]||[];
+  var all=ls.checks.every(function(ch,ci){return arr[ci]===ch.answer;});
+  if(all && !isDone(i)){
+    state.done[i]=true; save(); updateLevel();
+    toast(ls.level===100?'🏁 Level 100!':'Lesson complete · Level '+curLevel());
+    var nb=$('#nextBtn'); if(nb){nb.disabled=false; nb.textContent=(i===N-1?'Finish 🏁':'Next lesson →');}
+    var dp=$$('.lhead .pill'); // add complete pill if missing
+    if(dp.length && !$('.lhead .pill.done')){var p=document.createElement('span');p.className='pill done';p.textContent='✓ Complete';$('.lhead').appendChild(p);}
+  }
+  renderNav();
+}
+
+/* ============================================================
+   SIMULATORS
+   ============================================================ */
+function mountSim(id, box){
+  if(id==='log') simLog(box);
+  else if(id==='group') simGroup(box);
+  else if(id==='acks') simAcks(box);
+}
+function simHead(box,tag,title,sub){
+  box.innerHTML='<div class="simhd"><span class="tag">'+tag+'</span><h4>'+title+'</h4></div><div class="simsub">'+sub+'</div>';
+}
+
+/* --- Sim 1: append-only log + offsets + two consumer groups + replay --- */
+function simLog(box){
+  simHead(box,'Simulator','The append-only log','Produce records, then read them with two independent consumer groups. Reading never deletes.');
+  var recs=[], gA=0, gB=0;
+  var keys=['user1','user2','user3'], acts=['placed','paid','shipped','cancelled'];
+  var ctr=document.createElement('div');ctr.className='ctrls';
+  ctr.innerHTML='<button class="primary" data-a="prod">+ Produce record</button>'+
+    '<button data-a="pa">Group A poll →</button><button data-a="pb">Group B poll →</button>'+
+    '<button data-a="ea">A: reset → earliest</button><button data-a="lb">B: jump → latest</button>'+
+    '<button class="danger" data-a="clr">Clear</button>';
+  var stage=document.createElement('div');stage.className='simstage';
+  var out=document.createElement('div');out.className='simout';out.textContent='Log is empty. Click “Produce record”.';
+  var note=document.createElement('div');note.className='note';
+  note.innerHTML='<b>Notice:</b> A and B track <b>separate</b> offsets — same data, independent positions. A new reader at <b>earliest</b> replays everything; at <b>latest</b> it skips existing data (that\'s <code>auto.offset.reset</code>).';
+  box.appendChild(ctr);box.appendChild(stage);box.appendChild(out);box.appendChild(note);
+  function log(m){out.textContent=(m+'\n'+out.textContent).split('\n').slice(0,8).join('\n');}
+  function draw(){
+    if(!recs.length){stage.innerHTML='<div style="color:var(--faint);font:600 12px var(--mono)">— empty log —</div>';return;}
+    var cells=recs.map(function(r){return '<div class="cell"><div class="off">offset '+r.o+'</div><div class="kv"><span class="k">'+r.k+'</span>='+r.v+'</div></div>';}).join('');
+    stage.innerHTML='<div class="log-strip">'+cells+'</div>'+
+      '<div class="gptrs"><span class="gptr">Group A next read: <b>offset '+gA+'</b>'+(gA>=recs.length?' (caught up)':'')+'</span>'+
+      '<span class="gptr">Group B next read: <b>offset '+gB+'</b>'+(gB>=recs.length?' (caught up)':'')+'</span></div>';
+  }
+  ctr.onclick=function(e){var a=e.target.dataset.a;if(!a)return;
+    if(a==='prod'){var o=recs.length;recs.push({o:o,k:keys[o%keys.length],v:acts[o%acts.length]});log('Produced offset '+o+': '+recs[o].k+'='+recs[o].v);}
+    else if(a==='pa'){if(gA<recs.length){var r=recs[gA];log('Group A read offset '+gA+': '+r.k+'='+r.v);gA++;}else log('Group A is caught up — nothing new.');}
+    else if(a==='pb'){if(gB<recs.length){var r=recs[gB];log('Group B read offset '+gB+': '+r.k+'='+r.v);gB++;}else log('Group B is caught up — nothing new.');}
+    else if(a==='ea'){gA=0;log('Group A reset to EARLIEST (offset 0) — it will replay all history.');}
+    else if(a==='lb'){gB=recs.length;log('Group B jumped to LATEST (offset '+gB+') — it skips existing records.');}
+    else if(a==='clr'){recs=[];gA=0;gB=0;log('Cleared.');}
+    draw();
+  };
+  draw();
+}
+
+/* --- Sim 2: partitions + consumer group assignment + rebalance --- */
+function simGroup(box){
+  simHead(box,'Simulator','Consumer-group rebalancing','Change partitions and add/remove consumers. Each partition goes to exactly one consumer — extras go idle.');
+  var parts=4, cons=2;
+  var COL=['var(--b1)','var(--b2)','var(--b3)','var(--b4)','var(--b5)','var(--b6)','var(--b7)','var(--b8)'];
+  var ctr=document.createElement('div');ctr.className='ctrls';
+  ctr.innerHTML='<label>Partitions <input type="range" id="pr" min="1" max="8" value="4"><b id="prv" style="color:var(--accent)">4</b></label>'+
+    '<button data-a="add">+ Add consumer</button><button class="danger" data-a="rem">– Remove consumer</button>';
+  var stage=document.createElement('div');stage.className='simstage';
+  var note=document.createElement('div');note.className='note';
+  box.appendChild(ctr);box.appendChild(stage);box.appendChild(note);
+  function assign(){ // partition i -> consumer (i % cons); idle = consumers with no partition
+    var owner=[], used={};
+    for(var i=0;i<parts;i++){var c=cons>0?(i%cons):-1;owner[i]=c;used[c]=true;}
+    return owner;
+  }
+  function draw(){
+    var owner=assign();
+    var pboxes=owner.map(function(c,i){
+      var col=c>=0?COL[c%COL.length]:'var(--hair)';
+      return '<div class="pbox" style="border-color:'+col+'"><div class="pl">P'+i+'</div><div class="po" style="color:'+col+'">'+(c>=0?'C'+(c+1):'—')+'</div></div>';
+    }).join('');
+    var idle=[];for(var c=0;c<cons;c++){var has=owner.indexOf(c)>=0;if(!has)idle.push(c);}
+    var chips='';for(var c=0;c<cons;c++){var col=COL[c%COL.length];var isIdle=idle.indexOf(c)>=0;
+      chips+='<span class="cchip'+(isIdle?' idle':'')+'" style="background:'+col+'">C'+(c+1)+(isIdle?' · IDLE':'')+'</span>';}
+    stage.innerHTML='<div style="font:600 11px var(--mono);color:var(--muted);margin-bottom:7px">PARTITIONS → owner</div>'+
+      '<div class="parts">'+pboxes+'</div>'+
+      '<div style="font:600 11px var(--mono);color:var(--muted);margin:14px 0 0">CONSUMERS in group "billing"</div>'+
+      '<div class="chips">'+chips+'</div>';
+    note.innerHTML='<b>'+cons+' consumers, '+parts+' partitions.</b> '+
+      (cons>parts?('<span style="color:var(--shaky)">'+(cons-parts)+' consumer(s) idle</span> — max useful consumers = partition count ('+parts+').'):
+       (cons===parts?'Perfectly balanced — every consumer owns exactly one partition.':'Each consumer owns ~'+Math.ceil(parts/Math.max(cons,1))+' partition(s). Room to add '+(parts-cons)+' more.'));
+  }
+  ctr.querySelector('#pr').oninput=function(){parts=+this.value;ctr.querySelector('#prv').textContent=parts;toast('Rebalancing…');draw();};
+  ctr.onclick=function(e){var a=e.target.dataset.a;if(!a)return;
+    if(a==='add'&&cons<8){cons++;toast('Consumer joined → rebalance');}
+    else if(a==='rem'&&cons>0){cons--;toast('Consumer left → rebalance');}
+    draw();};
+  draw();
+}
+
+/* --- Sim 3: producer durability (acks / ISR / broker failure) --- */
+function simAcks(box){
+  simHead(box,'Simulator','Producer durability','Pick acks + min.insync.replicas, send records, then kill brokers. See data survive — or get lost / rejected.');
+  var acks='all', minISR=2;
+  // brokers: B1 leader,B2,B3 followers. alive + inISR. records: {id, on:[bool x3]}
+  var B=[{n:'B1',alive:true,leader:true},{n:'B2',alive:true,leader:false},{n:'B3',alive:true,leader:false}];
+  var recs=[], lost=0;
+  var ctr=document.createElement('div');ctr.className='ctrls';
+  ctr.innerHTML='<label>acks <select id="ak"><option value="0">0</option><option value="1">1</option><option value="all" selected>all</option></select></label>'+
+    '<label>min.insync <select id="mi"><option>1</option><option selected>2</option><option>3</option></select></label>'+
+    '<button class="primary" data-a="send">Send record</button>'+
+    '<button class="danger" data-a="kl">Kill leader</button>'+
+    '<button class="danger" data-a="kf">Kill a follower</button>'+
+    '<button data-a="rec">Recover all</button>';
+  var stage=document.createElement('div');stage.className='simstage';
+  var out=document.createElement('div');out.className='simout';
+  var note=document.createElement('div');note.className='note';
+  note.innerHTML='<b>RF = 3.</b> <code>acks=all</code> waits for the whole ISR (safe). <code>acks=1</code> acks on the leader only — kill it before it replicates and the record is <b>lost</b>. If the ISR drops below <b>min.insync</b>, writes are <b>rejected</b>.';
+  box.appendChild(ctr);box.appendChild(stage);box.appendChild(out);box.appendChild(note);
+  function log(m){out.textContent=(m+'\n'+out.textContent).split('\n').slice(0,8).join('\n');}
+  function isr(){return B.map(function(b,i){return b.alive?i:-1;}).filter(function(x){return x>=0;});} // alive = in ISR here
+  function leaderIdx(){for(var i=0;i<3;i++)if(B[i].alive&&B[i].leader)return i;return -1;}
+  function draw(){
+    var I=isr();
+    var brokers=B.map(function(b,i){
+      var cnt=recs.filter(function(r){return r.on[i];}).length;
+      var cls='broker '+(b.leader?'leader':'follower')+(b.alive?(I.indexOf(i)>=0?' insync':' outsync'):' dead');
+      return '<div class="'+cls+'"><div class="bn">'+b.n+'</div><div class="role">'+(b.alive?(b.leader?'leader':'follower'):'DOWN')+'</div>'+
+        '<div class="cnt">'+cnt+'</div><div class="isr">'+(b.alive?'in ISR':'—')+'</div></div>';
+    }).join('');
+    stage.innerHTML='<div class="brokers">'+brokers+'</div>'+
+      '<div style="font:600 11px var(--mono);color:var(--muted);margin-top:10px">ISR size: <b style="color:'+(I.length>=minISR?'var(--solid)':'var(--review)')+'">'+I.length+'</b> / min.insync '+minISR+
+      ' · committed records: '+recs.length+(lost?' · <span style="color:var(--review)">lost: '+lost+'</span>':'')+'</div>';
+  }
+  function send(){
+    var I=isr();
+    if(I.length<minISR){log('✗ REJECTED: ISR='+I.length+' < min.insync.replicas='+minISR+'. Kafka refuses the write to protect durability.');draw();return;}
+    var li=leaderIdx(); if(li<0){log('✗ No leader available.');draw();return;}
+    var on=[false,false,false];
+    if(acks==='all'){ I.forEach(function(i){on[i]=true;}); recs.push({on:on}); log('✓ acks=all: replicated to all '+I.length+' ISR members → durable.'); }
+    else { on[li]=true; // only leader so far; followers "lag" until you do nothing — models the danger window
+           recs.push({on:on}); log('• acks='+acks+': leader '+B[li].n+' has it; followers not yet confirmed (danger window).'); }
+    draw();
+  }
+  function killLeader(){
+    var li=leaderIdx(); if(li<0){log('No leader to kill.');return;}
+    B[li].alive=false;
+    // records only on the dead leader (not replicated) are LOST
+    var before=recs.length;
+    recs=recs.filter(function(r){ var survives=r.on.some(function(has,idx){return has&&B[idx].alive;}); return survives; });
+    var dropped=before-recs.length; lost+=dropped;
+    // elect new leader from remaining alive
+    B.forEach(function(b){b.leader=false;});
+    var ni=-1;for(var i=0;i<3;i++)if(B[i].alive){ni=i;break;}
+    if(ni>=0)B[ni].leader=true;
+    log((dropped>0?('⚠ '+dropped+' record(s) LOST — they were only on the killed leader. '):'New leader elected from ISR — no loss. ')+(ni>=0?('New leader: '+B[ni].n+'.'):'No brokers left!'));
+    draw();
+  }
+  function killFollower(){
+    for(var i=0;i<3;i++)if(B[i].alive&&!B[i].leader){B[i].alive=false;log('Killed follower '+B[i].n+' → ISR shrinks.');draw();return;}
+    log('No live follower to kill.');
+  }
+  function recover(){B=[{n:'B1',alive:true,leader:true},{n:'B2',alive:true,leader:false},{n:'B3',alive:true,leader:false}];recs=[];lost=0;log('All brokers recovered; cluster reset.');draw();}
+  ctr.querySelector('#ak').onchange=function(){acks=this.value;};
+  ctr.querySelector('#mi').onchange=function(){minISR=+this.value;draw();};
+  ctr.onclick=function(e){var a=e.target.dataset.a;if(!a)return;
+    if(a==='send')send();else if(a==='kl')killLeader();else if(a==='kf')killFollower();else if(a==='rec')recover();};
+  log('Ready. Try: acks=1 → Send → Kill leader (watch it get lost). Then acks=all and repeat.');
+  draw();
+}
+
+/* init */
+renderNav();updateLevel();
+if(state.cur>=0 && unlocked(state.cur)) renderLesson(state.cur); else renderRoadmap();
+</script>
+</body>
+</html>
